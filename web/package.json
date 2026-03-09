@@ -1,0 +1,59 @@
+{
+  "name": "vite-project",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@google/genai": "^1.24.0",
+    "@radix-ui/themes": "^3.2.1",
+    "@tensorflow-models/speech-commands": "^0.5.4",
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-backend-webgpu": "^4.22.0",
+    "@xyflow/react": "^12.8.6",
+    "anser": "^2.3.2",
+    "classnames": "^2.5.1",
+    "dayjs": "^1.11.19",
+    "diff": "^8.0.2",
+    "esbuild-wasm": "^0.25.12",
+    "file-saver": "^2.0.5",
+    "firebase": "^12.4.0",
+    "html-to-image": "^1.11.13",
+    "js-base64": "^3.7.8",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.545.0",
+    "matter-js": "^0.20.0",
+    "nanoid": "^5.1.6",
+    "niftty": "^0.1.2",
+    "react": "^18.2.0",
+    "react-diff-view": "^3.3.2",
+    "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
+    "react-router": "^6.30.1",
+    "react-router-dom": "^6.30.1",
+    "shaders": "^2.0.675",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@paper-design/shaders-react": "^0.0.71",
+    "@types/diff": "^7.0.2",
+    "@types/file-saver": "^2.0.7",
+    "@types/matter-js": "^0.20.2",
+    "@types/react": "^18.2.15",
+    "@types/react-dom": "^18.2.7",
+    "@vitejs/plugin-basic-ssl": "^2.1.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "sass": "^1.93.2",
+    "typescript": "^5.0.2",
+    "vite": "^7.1.12",
+    "vite-plugin-node-polyfills": "^0.24.0",
+    "vite-tsconfig-paths": "^5.1.4"
+  },
+  "overrides": {
+    "@tensorflow/tfjs-core": "^4.22.0"
+  }
+}

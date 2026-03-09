@@ -1,0 +1,13 @@
+[*.{kt,kts}]
+# 1. Indentation
+ktlint_standard_indent = disabled
+
+# 2. Argument List Wrapping
+ktlint_standard_argument-list-wrapping = disabled
+
+# 3. Imports
+ktlint_standard_no-wildcard-imports = disabled
+ktlint_standard_import-ordering = disabled
+
+# 4. Function Signatures
+ktlint_standard_function-signature = disabled

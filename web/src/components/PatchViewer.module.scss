@@ -1,0 +1,87 @@
+/**
+ * Copyright 2026 Reto Meier
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+.patch {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.file {
+  border: 1px solid var(--gray-6);
+  border-radius: var(--radius-3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.fileHeader {
+  appearance: none;
+  font: inherit;
+  background-color: var(--gray-4);
+  border: 0;
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 600;
+
+  .added {
+    color: var(--green-10);
+  }
+
+  .removed {
+    color: var(--red-10);
+  }
+
+  &:hover {
+    background-color: var(--gray-5);
+  }
+}
+
+.diff {
+  font-size: 12px;
+
+  --diff-font-family: var(--code-font-family, monospace);
+  --diff-background-color: var(--gray-4);
+  --diff-text-color: var(--gray-10);
+
+  --diff-gutter-insert-background-color: var(--green-3);
+  --diff-code-insert-background-color: var(--green-4);
+  --diff-code-insert-edit-background-color: var(--green-7);
+  --diff-gutter-insert-text-color: var(--green-12);
+  --diff-code-insert-text-color: var(--green-12);
+  --diff-code-insert-edit-text-color: var(--gray-12);
+
+  --diff-gutter-delete-background-color: var(--red-3);
+  --diff-code-delete-background-color: var(--red-4);
+  --diff-code-delete-edit-background-color: var(--red-7);
+  --diff-gutter-delete-text-color: var(--red-12);
+  --diff-code-delete-text-color: var(--red-12);
+  --diff-code-delete-edit-text-color: var(--gray-12);
+
+  --diff-gutter-selected-background-color: #fffce0;
+  --diff-gutter-selected-text-color: var(--gray-12);
+  --diff-code-selected-background-color: #fffce0;
+  --diff-code-selected-text-color: var(--gray-12);
+  --diff-selection-background-color: #b3d7ff;
+  --diff-selection-text-color: var(--gray-12);
+
+  --diff-omit-gutter-line-color: #cb2a1d;
+}

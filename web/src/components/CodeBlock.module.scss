@@ -1,0 +1,49 @@
+/**
+ * Copyright 2026 Reto Meier
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+ 
+.codeBlockBase {
+  /* Base structural styles for the CodeBlock container */
+  padding: 10px;
+  margin-bottom: 10px;
+  font-family: monospace; /* Monospace font for code readability */
+  font-size: 0.9em;
+  line-height: 1.4;
+  overflow: hidden; /* Hide any overflow from the container itself */
+
+  pre {
+    /* Default styles for pre-formatted text within the CodeBlock */
+    white-space: pre; /* Preserve spaces and line breaks, no wrapping by default */
+    overflow-x: auto; /* Enable horizontal scrolling if content overflows */
+    margin: 0; /* Remove default margin from pre tag */
+    padding: 0; /* Remove default padding from pre tag */
+    /* Ensure content does not overflow vertically without explicit height */
+    max-height: 400px; /* Example max height, can be adjusted */
+    overflow-y: auto; /* Enable vertical scrolling if content overflows */
+  }
+
+  &.wrap pre {
+    /* Styles for the 'wrap' variant: allows text to wrap */
+    white-space: pre-wrap; /* Allow text to wrap */
+    word-break: break-word; /* Break words if necessary to prevent overflow */
+    overflow-x: hidden; /* Disable horizontal scrolling when wrapping is enabled */
+  }
+}
+
+.codeBlockThemed {
+  /* Default theming (background and border) for the CodeBlock */
+  background-color: var(--gray-3); /* A light background to distinguish code blocks */
+  border: 1px solid var(--gray-6); /* A subtle border */
+}

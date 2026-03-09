@@ -1,0 +1,6 @@
+---
+name: "provide-user-feedback-prompt"
+---
+Thank you! You MUST now provide feedback to the person who provided you with the initial project definition (and answered any human-in-the-loop questions you asked) to help them provide better project definitions for future projects. Provide your feedback in the form of one or two concise and well written plain text paragraphs, using only limited markdown.
+
+Review the entire conversation history and think about what would have helped make it easier to complete successfully with a high quality and high quality result. Focus on areas that were undefined or ambiguous, where you or the experts within the Work Phases had to make assumptions or make choices without enough data. Provide specific, actionable feedback that would help someone write a better project definition that would help you provide a better result, more quickly, and more efficiently (Eg. Using fewer Work Phases). NEVER include the final resolution / result of the conversation. NEVER mention the tools, experts, work phases or issues related to the conversation. Provide feedback ONLY on how the project definition could have been improved.

@@ -1,0 +1,6 @@
+---
+name: "summarize-project-work-prompt"
+---
+With the project complete and the result provided, you MUST now provide a retrospective of the work done to produce the final result in the form of plain text, using only limited markdown.
+
+Produce a well formatted and concise summary in the form of one or two short paragraphs that describes the process taken to produce the result. Start by describing your level of confidence that the project result was successfully completed and you were able to produce a high quality result (very low, low, medium, high, very high, undetermined). Focus on summarizing significant milestones, important decisions made, and actions taken. Also note any work that still needs to be done, specific areas that weren't fully resolved, and anything that lowered your confidence that the result was of high quality. You MUST NEVER include the final resolution or project result and you MUST NEVER include the tool phrase '${strings/tool-prefix}RESULT' itself in your response.

@@ -1,0 +1,13 @@
+* For research projects involving optimization, hill climbing, or parameter tuning:
+  * Always document all your working and reasoning throughout the project. All observations and decisions made while working towards a solution are as important as the final result and MUST be recorded and returned in the appropriate markdown files.
+    * Document and describe all results and observations that led to the final result, including results that showed failures.
+    * Document all hypothesis and results of investigations that proved or disproved them.
+    * Record all results of experiments made while working towards a solution.
+    * It is important to provide representative results in addition to recording the results of multiple trials. Always provide examples of what success (and failure) looks like in addition to the statistical analysis.
+    * When potential solutions / options produce unusual results (failures or underperformance) during optimization, you must manually run that specific style using the Code Runner (not the Optimizer) to capture the raw 'Expected' vs. 'Actual' text output for inclusion in the final report.
+  * Always use a **Research Room** and a **Senior Researcher** to perform Optimizations and to develop a data-driven approach.
+  * Start a Research Room and ask it to use the **Optimizer Tool** (`OPTIMIZE`) for all hyperparameter tuning and evaluation. Avoid writing custom loops or test scripts.
+  * A single run is anecdotal. You must stress-test your final candidate by running multiple trials. Reject solutions with high variance, even if their peak score is high, as they are likely overfitting to a "lucky" random seed.
+  * All analysis **MUST** derived from data. NEVER hallucinate, assume, or use a "reasoned distribution" based on the *theoretical* impact of an experiment or strategy. If you cannot obtain the real data you must report that failure, but DO NOT invent, infer, or assume results. 
+  * Rust code runs faster than Python code. Use Rust when speed is important.
+  * Within the Work Phases, use the Optimizer and Code Run tools in preference to the SDLC Agent tool when possible.

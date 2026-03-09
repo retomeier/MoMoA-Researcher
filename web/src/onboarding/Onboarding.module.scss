@@ -1,0 +1,98 @@
+/**
+ * Copyright 2026 Reto Meier
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 440px;
+  height: 100svh;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.backdrop,
+.godrays {
+  position: fixed;
+  inset: 0;
+}
+
+.godrays {
+  mask-image: radial-gradient(
+    circle closest-side at 50% 50%,
+    transparent 50%,
+    black 100%
+  );
+}
+
+.card {
+  // not perfectly centered to avoid vertical layout shift when switching screens
+  --rough-card-height: 340px;
+  margin-top: calc((100svh - var(--rough-card-height)) / 2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.logo,
+.image {
+  border-radius: var(--radius-3);
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0px auto 20px auto;
+}
+
+.image {
+  background-color: var(--gray-a3);
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-4px);
+  }
+  25%, 75% {
+    transform: translateX(4px);
+  }
+}
+
+.inviteCodeField.isError {
+  animation: shake 0.3s ease-in-out;
+}
+
+.inviteCodeField input {
+  font-family: var(--font-family-code);
+  letter-spacing: 0.2em;
+
+  &::placeholder {
+    font-family: var(--font-family-body);
+    letter-spacing: normal;
+  }
+}
+
+.avatar {
+  position: fixed;
+  right: 24px;
+  top: 24px;
+  z-index: 1;
+}

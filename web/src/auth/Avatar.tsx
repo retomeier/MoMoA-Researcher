@@ -1,0 +1,44 @@
+/**
+ * Copyright 2026 Reto Meier
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import cn from "classnames";
+import { forwardRef, HTMLAttributes } from "react";
+import styles from "./Avatar.module.scss";
+
+type Props = HTMLAttributes<HTMLImageElement> & {
+  src?: string | null;
+  displayName?: string | null;
+};
+
+export const Avatar = forwardRef<HTMLImageElement, Props>(
+  ({ src, displayName, className, style, ...props }, ref) => {
+    return (
+      <img
+        ref={ref}
+        {...props}
+        referrerPolicy="no-referrer"
+        className={cn(styles.avatar, className)}
+        src={sanitizePhotoURL(src || "")}
+        alt={displayName || ""}
+        style={style}
+      />
+    );
+  }
+);
+
+export function sanitizePhotoURL(s: string) {
+  return (s || "") + "?sz=256";
+}

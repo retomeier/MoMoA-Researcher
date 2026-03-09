@@ -1,0 +1,196 @@
+/**
+ * Copyright 2026 Reto Meier
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+ 
+.list {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.list.isFullCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  align-items: stretch;
+  gap: 16px;
+
+  .item {
+    border: 1px solid var(--gray-6);
+    height: stretch;
+    padding-left: 32px;
+  }
+
+  .statusDot {
+    left: 16px;
+  }
+}
+
+.itemContainer {
+  position: relative;
+  order: var(--order);
+}
+
+.item {
+  --status-color: var(--gray-11);
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  padding: 8px 32px 8px 24px;
+  border-radius: var(--radius-2);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--gray-11);
+
+  &.isActive {
+    background-color: var(--gray-5);
+  }
+
+  &:hover {
+    background-color: var(--gray-4);
+  }
+
+  &[data-status="complete"] {
+    --status-color: var(--green-11);
+  }
+
+  &[data-status="blocked"] {
+    --status-color: var(--amber-11);
+  }
+
+  &[data-status="running"] {
+    --status-color: var(--blue-11);
+  }
+
+  &[data-status="failed"] {
+    --status-color: var(--red-11);
+  }
+}
+
+.title {
+  color: var(--gray-12);
+}
+
+.latestStatus {
+  display: none;
+  font-size: 12px;
+  color: var(--status-color);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+
+  .list.isFullCards & {
+    display: block;
+  }
+}
+
+.subtitle {
+  font-size: 11px;
+  color: var(--gray-10);
+}
+
+.statusDot {
+  position: absolute;
+  left: 8px;
+  top: 12px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 8px;
+  margin-top: 4px;
+  flex-shrink: 0;
+  background-color: var(--status-color);
+
+  .item[data-status="running"] & {
+    animation: pulse 1s infinite alternate;
+
+    @keyframes pulse {
+      from {
+        opacity: 0.3;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+  }
+}
+
+.itemContainer:hover,
+.itemContainer:focus-within {
+  .action {
+    opacity: 1;
+  }
+}
+
+.action {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  margin: 0;
+}
+
+.emptyState {
+  text-align: center;
+}
+
+.loadingSpinner {
+  margin: 0 auto;
+}
+
+.projectGroup {
+  display: flex;
+  flex-direction: column;
+  margin-top: 12px;
+}
+
+.projectHeader {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  border-radius: var(--radius-2);
+
+  a {
+    text-decoration: none;
+  }
+
+  &:hover {
+    background-color: var(--gray-4);
+  }
+}
+
+.toggleIcon {
+  margin-right: 4px;
+  color: var(--gray-11);
+  flex-shrink: 0;
+}
+
+.projectTitle {
+  color: var(--gray-12);
+  text-decoration: none !important; 
+  transition: color 0.15s ease;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--accent-11, var(--blue-11));
+  }
+}
+
+.sessionChildren {
+  padding-left: 10px;
+}
