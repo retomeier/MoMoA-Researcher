@@ -109,7 +109,7 @@ Project Home Page:
 [https://labs.google/code/experiments/momoa-researcher](https://labs.google/code/experiments/momoa-researcher)
 
 Code Home:
-[https://github.com/retomeier/momoa](https://github.com/retomeier/MoMoA-Researcher)
+[https://github.com/retomeier/MoMoA-Researcher](https://github.com/retomeier/MoMoA-Researcher)
 
 Maintained by:
 Reto Meier
