@@ -79,6 +79,16 @@ const runnerInstanceId = randomUUID();
 const SERVER_MAX_DURATION_MS = 55 * 60 * 1000;
 const SERVER_GRACE_PERIOD_MS = 5 * 60 * 1000;
 
+function ignoreAbortedFirebaseWrite(
+  operation: Promise<unknown>,
+  context: string
+): void {
+  operation.catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[Firebase] Ignored write failure during ${context}: ${message}`);
+  });
+}
+
 export async function runSession(
   sessionId: string,
   takeOverIfActive = false
@@ -113,22 +123,32 @@ export async function runSession(
   // set ourselves as the active runner for this session, and when this process exits, clear the
   // active runner info for this session... this also handles reconnections
   let disc: OnDisconnect | undefined;
-  db.ref(".info/connected").on("value", (snapshot) => {
+  const connectedRef = db.ref(".info/connected");
+  const connectedListener = connectedRef.on("value", (snapshot) => {
     let connected = !!snapshot.val();
     if (connected) {
-      runnerRef.set(runnerInstanceId);
+      ignoreAbortedFirebaseWrite(
+        runnerRef.set(runnerInstanceId),
+        `setting runner instance for session ${sessionId}`
+      );
       disc?.cancel();
       disc = runnerRef.onDisconnect();
-      disc.set(null);
+      ignoreAbortedFirebaseWrite(
+        disc.set(null),
+        `registering onDisconnect for session ${sessionId}`
+      );
     }
   });
 
   // listen for incoming messages (also look at all pending actions on first subscribe)
   let actionQueueRef = sessionRef.child("actionQueue");
-  actionQueueRef.on("child_added", async (snapshot) => {
+  const actionQueueListener = actionQueueRef.on("child_added", async (snapshot) => {
     const action = snapshot.val();
     handleIncomingMessage(sessionId, action);
-    actionQueueRef.child(snapshot.key!).remove();
+    ignoreAbortedFirebaseWrite(
+      actionQueueRef.child(snapshot.key!).remove(),
+      `removing action queue item for session ${sessionId}`
+    );
   });
 
   let tornDown = false;
@@ -137,15 +157,23 @@ export async function runSession(
     console.log(`Session ${sessionId} cleaning up because: ${reason}`);
     tornDown = true;
     runningSessions.delete(sessionId);
+    connectedRef.off("value", connectedListener);
+    actionQueueRef.off("child_added", actionQueueListener);
     disc?.cancel();
     disc = undefined;
     sessionCompleteDeferred.resolve();
-    runnerRef.set(null);
+    ignoreAbortedFirebaseWrite(
+      runnerRef.set(null),
+      `clearing runner instance for session ${sessionId}`
+    );
   };
 
   session.bus.addEventListener("sessionComplete", () => teardown("Completed"));
   session.abort.signal.addEventListener("abort", () => {
-    sessionRef.child("metadata").update({ status: "failed" });
+    ignoreAbortedFirebaseWrite(
+      sessionRef.child("metadata").update({ status: "failed" }),
+      `marking session ${sessionId} as failed after abort`
+    );
     sendMessage(
       sessionId,
       JSON.stringify({
