@@ -43,7 +43,9 @@ import { resolveProjectSpecification } from "./utils/projectSpecResolver.js";
 
 // firebase config
 let appOptions: AppOptions = {
-  databaseURL: "https://threeplabs-default-rtdb.firebaseio.com/",
+  databaseURL:
+    process.env.FIREBASE_DATABASE_URL ||
+    "https://momoa-a2901-default-rtdb.europe-west1.firebasedatabase.app/",
 };
 if (process.env.NODE_ENV === "development") {
   const sa = fs.readFileSync(
