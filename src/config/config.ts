@@ -24,6 +24,7 @@ import {
   createContentGeneratorConfig,
 } from "../services/contentGenerator.js";
 import { GeminiClient } from "../services/geminiClient.js";
+import { LlmClient } from "../services/llmClient.js";
 import { ApiPolicyManager } from "../services/apiPolicyManager.js";
 import { InfrastructureContext } from "../momoa_core/types.js";
 import { getAssetString } from "../services/promptManager.js";
@@ -60,7 +61,7 @@ export class Config implements InfrastructureContext {
   private readonly fullContext: boolean;
   private readonly coreTools: string[] | undefined;
   private readonly excludeTools: string[] | undefined;
-  private geminiClient!: GeminiClient;
+  private llmClient!: LlmClient;
   private readonly model: string;
   private readonly maxTurns?: number; // Initialized from params.maxTurns
   private readonly assumptions?: string; // Initialized from params.assumptions
@@ -90,7 +91,7 @@ export class Config implements InfrastructureContext {
     this.apiKey = this.contentGeneratorConfig.apiKey || '';
 
     const apiPolicyManager = new ApiPolicyManager();
-    this.geminiClient = new GeminiClient(this, apiPolicyManager);
+    this.llmClient = new GeminiClient(this, apiPolicyManager);
 
     // Reset the session flag since we're explicitly changing auth and using default model
     this.modelSwitchedDuringSession = false;
@@ -153,8 +154,12 @@ export class Config implements InfrastructureContext {
     return this.excludeTools;
   }
 
-  async getGeminiClient(): Promise<GeminiClient> {
-    return this.geminiClient;
+  async getLlmClient(): Promise<LlmClient> {
+    return this.llmClient;
+  }
+
+  async getGeminiClient(): Promise<LlmClient> {
+    return this.getLlmClient();
   }
 
   getMaxTurns(): number | undefined {

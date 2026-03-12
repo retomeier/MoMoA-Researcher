@@ -15,7 +15,7 @@
  */
 
 import { DEFAULT_GEMINI_PRO_MODEL } from "../config/models";
-import { GeminiClient } from "../services/geminiClient";
+import { LlmClient } from "../services/llmClient";
 import { getAssetString, getExpertPrompt } from "../services/promptManager";
 import { removeBacktickFences } from "../utils/markdownUtils";
 import { OverseerFeedback, GuidanceType } from "./types";
@@ -28,7 +28,7 @@ const NO_DIFF_STRING = "---No diff information available---"
  */
 export class Overseer {
   private interval: number;
-  private multiAgentGeminiClient: GeminiClient;
+  private multiAgentGeminiClient: LlmClient;
   private onFeedback: () => Promise<void>; // Internal callback for timer
   private worklog: string;
   private intervalId: NodeJS.Timeout | null;
@@ -41,7 +41,7 @@ export class Overseer {
   private currentDiff: string;
   private assumptions: string;
 
-  private constructor(interval: number, preamble: string, assumptions: string, multiAgentGeminiClient: GeminiClient) {
+  private constructor(interval: number, preamble: string, assumptions: string, multiAgentGeminiClient: LlmClient) {
     if (!interval) {
       throw new Error("Overseer requires an interval.");
     }
@@ -268,7 +268,7 @@ ${this.assumptions}`);
     }
   }
 
-  public static async createAndStart(interval: number, assumptions: string, multiAgentGeminiClient: GeminiClient): Promise<Overseer> {
+  public static async createAndStart(interval: number, assumptions: string, multiAgentGeminiClient: LlmClient): Promise<Overseer> {
     try {
       const { preamble } = await getExpertPrompt('overseer');
       const newOverseer = new Overseer(interval, preamble, assumptions, multiAgentGeminiClient);

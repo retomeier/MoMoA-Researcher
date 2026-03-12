@@ -22,7 +22,7 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_LITE_MODEL,
 } from '../config/models.js';
-import { GeminiClient } from '../services/geminiClient.js';
+import { LlmClient } from '../services/llmClient.js';
 import { getAssetString, getExpertPrompt, replaceRuntimePlaceholders } from '../services/promptManager.js';
 import { TranscriptManager } from '../services/transcriptManager.js';
 import { ServerMode, UserSecrets } from '../shared/model.js';
@@ -57,7 +57,7 @@ export class Orchestrator {
   private originalBinaryFileMap: Map<string, string>;
   private transcriptManager: TranscriptManager;
   private infrastructureContext: InfrastructureContext;
-  private multiAgentGeminiClient: GeminiClient;
+  private multiAgentGeminiClient: LlmClient;
   private sendMessage: (message: string) => void;
   private fileMap: Map<string, string>;
   private binaryFileMap: Map<string, string>; 
@@ -102,7 +102,7 @@ export class Orchestrator {
     initialImageMimeType: string | undefined, 
     fileMap: Map<string, string>,
     binaryFileMap: Map<string, string>, 
-    multiAgentGeminiClient: GeminiClient,
+    multiAgentGeminiClient: LlmClient,
     sendMessage: (message: string) => void,
     assumptions: string,
     _baseModelName: string = DEFAULT_GEMINI_FLASH_MODEL, 

@@ -16,7 +16,7 @@
 
 import { DEFAULT_GEMINI_LITE_MODEL } from "../config/models";
 import { FileSummary, InfrastructureContext } from "../momoa_core/types";
-import { GeminiClient } from "../services/geminiClient";
+import { LlmClient } from "../services/llmClient";
 import { getAssetString, replaceRuntimePlaceholders } from "../services/promptManager";
 import { getLockFileFileDescription, isLockFile } from "./diffGenerator";
 import { removeBacktickFences, repairTruncatedJsonArray, toKebabCase } from "./markdownUtils";
@@ -116,8 +116,8 @@ let dynamicallyAddedRelevantFiles: Set<string> = new Set();
  */
 export async function analyzeFiles(
   fileMap: Map<string, string>, 
-  binaryFileMapOrClient?: Map<string, string> | GeminiClient,
-  multiAgentGeminiClient?: GeminiClient
+  binaryFileMapOrClient?: Map<string, string> | LlmClient,
+  multiAgentGeminiClient?: LlmClient
 ): Promise<void> {
   fileAnalysis.clear();
   taskRelevantFiles = [];
@@ -132,7 +132,7 @@ export async function analyzeFiles(
     if ('entries' in binaryFileMapOrClient && typeof (binaryFileMapOrClient as Map<string, unknown>).entries === 'function') {
       binaryFileMap = binaryFileMapOrClient as Map<string, string>;
     } else {
-      client = binaryFileMapOrClient as GeminiClient;
+      client = binaryFileMapOrClient as LlmClient;
     }
   }
 
@@ -203,7 +203,7 @@ export function removeFileEntry(filename: string) {
  * @param explicitUpdate A specific FileSummary to apply to the file.
  * @param skipAnalysis If true, skips the LLM analysis and only updates the metadata map.
  */
-export async function updateFileEntry(filename: string, fileMap: Map<string, string>, multiAgentGeminiClient?: GeminiClient, explicitUpdate?: FileSummary, skipAnalysis: boolean = false): Promise<FileSummary | undefined> {
+export async function updateFileEntry(filename: string, fileMap: Map<string, string>, multiAgentGeminiClient?: LlmClient, explicitUpdate?: FileSummary, skipAnalysis: boolean = false): Promise<FileSummary | undefined> {
   if (isLockFile(filename)) {
     const lockFileSummary: FileSummary = {
         filename: filename,
@@ -286,7 +286,7 @@ export async function analyzeAndSetTaskRelevantFiles(
   fileMap: Map<string, string>,
   binaryFileMap: Map<string, string>,
   infrastructureContext: InfrastructureContext,
-  multiAgentGeminiClient: GeminiClient,
+  multiAgentGeminiClient: LlmClient,
   sendMessage: (message: string) => void,
   image?: string, 
   imageMimeType?: string
@@ -558,7 +558,7 @@ export function getFilesDocsListString(
  * In a real scenario, this might involve an LLM call or parsing a project file.
  * @returns The determined or generated project name.
  */
-export async function getProjectName(multiAgentGeminiClient?: GeminiClient): Promise<string | undefined> {
+export async function getProjectName(multiAgentGeminiClient?: LlmClient): Promise<string | undefined> {
   if (projectName)
     return projectName;
 
@@ -583,7 +583,7 @@ function parseFilenamesList(filenamesString: string): string[] {
                         .filter(name => name !== '');
 }
 
-async function doFileAnalysis(filesToAnalyze: Set<string>, fileMap: Map<string, string>, multiAgentGeminiClient: GeminiClient): Promise<Map<string, FileSummary>> {
+async function doFileAnalysis(filesToAnalyze: Set<string>, fileMap: Map<string, string>, multiAgentGeminiClient: LlmClient): Promise<Map<string, FileSummary>> {
   const allFileSummaries = new Map<string, FileSummary>();
 
   const initialPromptTemplate = await getAssetString('code-search-analysis');
@@ -630,7 +630,7 @@ ${fileMap.get(filename) || '[Content not found]'}
   return allFileSummaries;
 }
 
-async function refreshProjectName(multiAgentGeminiClient: GeminiClient): Promise<string | undefined> {
+async function refreshProjectName(multiAgentGeminiClient: LlmClient): Promise<string | undefined> {
   const existingProjectNamePromptChunk = projectName ? `We previously derived the project name '${projectName}'. If that is still a reasonable project name, simply return that. If it's very clear that the existing project name is the _wrong_ project name, then return *only* a better and clearly more relevant project name. You MUST NOT replace a random word project name with a different random word. If in doubt, return the existing project name.` : '';
 
   const fileDescriptions = getFileDescriptions();

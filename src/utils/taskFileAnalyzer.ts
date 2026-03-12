@@ -15,7 +15,7 @@
  */
 
 import { DEFAULT_GEMINI_FLASH_MODEL } from "../config/models";
-import { GeminiClient } from "../services/geminiClient";
+import { LlmClient } from "../services/llmClient";
 import { getAssetString, replaceRuntimePlaceholders } from "../services/promptManager";
 import { TranscriptManager } from "../services/transcriptManager";
 import { removeBacktickFences, repairTruncatedJsonArray, replaceContentBetweenMarkers } from "./markdownUtils"; 
@@ -113,7 +113,7 @@ export async function analyzeRelevantFilesForTask(
   fileMap: Map<string, string>,
   binaryFileMap: Map<string, string>,
   infrastructureContext: InfrastructureContext,
-  multiAgentGeminiClient: GeminiClient,
+  multiAgentGeminiClient: LlmClient,
   sendMessage: (message: string) => void,
   image?: string,
   imageMimeType?: string

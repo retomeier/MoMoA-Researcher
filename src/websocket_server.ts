@@ -307,7 +307,7 @@ async function handleInitialRequest(clientUUID: string, requestData: InitialRequ
 
     await requestConfig.refreshAuth(AuthType.USE_GEMINI);
 
-    const geminiClient = await requestConfig.getGeminiClient();
+    const geminiClient = await requestConfig.getLlmClient();
 
     const controller = new AbortController();
     const sendMessageCallback = (message: string) => sendMessage(clientUUID, message);

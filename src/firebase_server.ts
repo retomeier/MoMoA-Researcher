@@ -577,7 +577,7 @@ async function handleInitialRequest(
       googleApiKey: secrets.geminiApiKey,
     });
 
-    const geminiClient = await requestConfig.getGeminiClient();
+    const geminiClient = await requestConfig.getLlmClient();
 
     const sendMessageCallback = (message: string) =>
       sendMessage(clientUUID, message);

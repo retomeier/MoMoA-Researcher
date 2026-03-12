@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { GeminiClient } from '../services/geminiClient.js';
+import { LlmClient } from '../services/llmClient.js';
 import { TranscriptManager } from '../services/transcriptManager.js';
 import { UserSecrets } from '../shared/model.js';
 import { Overseer } from './overseer.js';
@@ -77,7 +77,7 @@ export interface MultiAgentToolContext {
   originalFileMap: Map<string, string>;
   originalBinaryFileMap: Map<string, string>;
   sendMessage: (message: string) => void;
-  multiAgentGeminiClient: GeminiClient;
+  multiAgentGeminiClient: LlmClient;
   experts: string[];
   transcriptsToUpdate: TranscriptManager[];
   transcriptForContext: TranscriptManager;
