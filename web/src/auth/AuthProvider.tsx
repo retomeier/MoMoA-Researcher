@@ -15,9 +15,12 @@
  */
 
 import { auth } from "@/firebase";
+import { useToast } from "@/components/Toast";
 import {
   GoogleAuthProvider,
+  AuthError,
   onAuthStateChanged,
+  signInWithRedirect,
   signInWithPopup,
   signOut,
   UserInfo,
@@ -61,10 +64,35 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [hasAccess, setHasAccess] = useState<string | null>(null);
   const [authLoaded, setAuthLoaded] = useState(false);
+  const { toast } = useToast();
 
   const signIn = useCallback(async () => {
-    await signInWithPopup(auth, new GoogleAuthProvider());
-  }, []);
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      const authError = error as AuthError;
+      if (
+        authError.code === "auth/popup-blocked" ||
+        authError.code === "auth/popup-closed-by-user"
+      ) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+
+      const errorDetail =
+        authError.code === "auth/unauthorized-domain"
+          ? `Add ${window.location.hostname} to Firebase Authentication > Settings > Authorized domains.`
+          : authError.message;
+
+      console.error("Google sign-in failed", authError);
+      toast("Google sign-in failed", {
+        status: "error",
+        detail: errorDetail,
+        duration: 6000,
+      });
+    }
+  }, [toast]);
 
   const _signOut = useCallback(async () => {
     await signOut(auth);
