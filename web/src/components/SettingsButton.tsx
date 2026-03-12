@@ -27,7 +27,7 @@ import {
 import { Settings2Icon } from "lucide-react";
 
 export function SettingsButton() {
-  const { prefs, updatePrefs } = usePrefsContext();
+  const { prefs, runtimeConfig, updatePrefs } = usePrefsContext();
   return (
     <Popover.Root>
       <Tooltip content="Settings">
@@ -39,7 +39,7 @@ export function SettingsButton() {
             style={{ position: "relative" }}
           >
             <Settings2Icon size={20} />
-            {!areRequiredPrefsSet(prefs) && (
+            {!areRequiredPrefsSet(prefs, runtimeConfig) && (
               <div
                 style={{
                   position: "absolute",

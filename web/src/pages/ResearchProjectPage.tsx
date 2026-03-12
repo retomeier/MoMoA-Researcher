@@ -151,7 +151,7 @@ export const ResearchProjectPage: React.FC = () => {
   const { projectId, sessionId } = useParams<ProjectRouteParams>();
   const navigate = useNavigate();
   const { user } = useAuthContext();
-  const { prefs } = usePrefsContext();
+  const { prefs, runtimeConfig } = usePrefsContext();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [project, setProject] = useState<ProjectMetadata | null>(null);
@@ -161,6 +161,7 @@ export const ResearchProjectPage: React.FC = () => {
   const [sessionContextText, setSessionContextText] = useState<string>("");
   const [isGeneratingTasks, setIsGeneratingTasks] = useState(false);
   const [isGeneratingProjectDetails, setIsGeneratingProjectDetails] = useState(false);
+  const [showChatActivity, setShowChatActivity] = useState(false);
 
   // 1. Initialize state DIRECTLY from localStorage (Lazy Initializer)
   const [autoRunNext, setAutoRunNext] = useState(() => {
@@ -187,7 +188,7 @@ export const ResearchProjectPage: React.FC = () => {
 
   const combinedChatContext = `${sessionContextText}`;
   
-  const { sendMessage, isSending, transcript, deleteTranscript } = useGeminiChat(chatNamespace, combinedChatContext);
+  const { sendMessage, isSending, transcript, deleteTranscript, activityLog } = useGeminiChat(chatNamespace, combinedChatContext);
 
   // 1. Fetch Project Metadata
   useEffect(() => {
@@ -309,7 +310,7 @@ export const ResearchProjectPage: React.FC = () => {
   };
 
   const generateProjectDetails = async (summaryText: string) => {
-    if (!prefs.geminiApiKey || !projectId) return;
+    if (!projectId) return;
 
     try {
       const projectNameDescriptionPrompt = `Based on the following task result summary, generate a short, clever "Research Project Name" (max 7 words) and a 1-sentence "Description". 
@@ -318,7 +319,7 @@ export const ResearchProjectPage: React.FC = () => {
               
               Return JSON format: { "title": "...", "description": "..." }`;
 
-      const projectMetaTitle = await sendGeminiOneShot(projectNameDescriptionPrompt, prefs.geminiApiKey);
+      const projectMetaTitle = await sendGeminiOneShot(projectNameDescriptionPrompt, prefs.geminiApiKey || "", runtimeConfig?.defaultModel);
 
       if (projectMetaTitle) {
         const cleanProjectMetaTitle = removeBacktickFences(projectMetaTitle);
@@ -343,7 +344,7 @@ export const ResearchProjectPage: React.FC = () => {
   }, [sessionMeta]);
 
   const handleRefreshProjectDetails = async () => {
-    if (!prefs.geminiApiKey || !projectId || !project) return;
+    if (!projectId || !project) return;
     if (!sessionId) {
       alert("Please select a session first to base the context on.");
       return;
@@ -357,7 +358,7 @@ export const ResearchProjectPage: React.FC = () => {
       const prompt = await buildProjectContextPrompt(projectId, sessionId, project, taskObjective, outputFormat);
 
       // 5. Send to LLM and update DB
-      const projectMetaTitle = await sendGeminiOneShot(prompt.trim(), prefs.geminiApiKey, DEFAULT_GEMINI_LITE_MODEL);
+      const projectMetaTitle = await sendGeminiOneShot(prompt.trim(), prefs.geminiApiKey || "", DEFAULT_GEMINI_LITE_MODEL);
 
       if (projectMetaTitle) {
         const cleanProjectMetaTitle = removeBacktickFences(projectMetaTitle);
@@ -743,7 +744,7 @@ const handleDeleteProject = async () => {
   };
 
 const generateProposedTasks = async (_currentSessionHistoryItems: HistoryItem[]): Promise<string[]> => {
-    if (!prefs.geminiApiKey || !projectId || !project || !sessionId) return [];
+    if (!projectId || !project || !sessionId) return [];
 
     setIsGeneratingTasks(true);
     try {
@@ -762,7 +763,7 @@ const generateProposedTasks = async (_currentSessionHistoryItems: HistoryItem[])
       );
 
       // 3. Send to Gemini
-      const responseText = await sendGeminiOneShot(prompt, prefs.geminiApiKey, DEFAULT_GEMINI_PRO_MODEL);
+      const responseText = await sendGeminiOneShot(prompt, prefs.geminiApiKey || "", DEFAULT_GEMINI_PRO_MODEL);
 
       if (responseText) {
         const cleanText = removeBacktickFences(responseText);
@@ -914,14 +915,38 @@ const generateProposedTasks = async (_currentSessionHistoryItems: HistoryItem[])
           {/* 2. Session Chat Panel (Moved to Middle) */}
           <div className={styles.panel}>
             <div className={styles.panelHeader}>
-              Chat
-              <Tooltip content="Clear Chat Transcript">
-                <IconButton size="1" variant="ghost" color="red" onClick={deleteTranscript}>
-                  <Trash2Icon size={14} />
-                </IconButton>
-              </Tooltip>
+              <Flex align="center" gap="2">
+                Chat
+                <Button
+                  size="1"
+                  variant="ghost"
+                  color="gray"
+                  onClick={() => setShowChatActivity((prev) => !prev)}
+                >
+                  {showChatActivity ? "Hide Activity" : "Show Activity"}
+                </Button>
+                <Tooltip content="Clear Chat Transcript">
+                  <IconButton size="1" variant="ghost" color="red" onClick={deleteTranscript}>
+                    <Trash2Icon size={14} />
+                  </IconButton>
+                </Tooltip>
+              </Flex>
             </div>
             <div className={styles.panelBody}>
+              {showChatActivity && (
+                <Card size="1" variant="surface" style={{ marginBottom: 12, backgroundColor: 'var(--gray-2)' }}>
+                  <Flex direction="column" gap="2">
+                    <Text size="1" weight="medium" color="gray">Live Activity</Text>
+                    {activityLog.length ? (
+                      activityLog.map((item, index) => (
+                        <Text key={index} size="1" color="gray">• {item}</Text>
+                      ))
+                    ) : (
+                      <Text size="1" color="gray">No activity yet for this chat request.</Text>
+                    )}
+                  </Flex>
+                </Card>
+              )}
               <div className={styles.chatHistory}>
                 {transcript.map((entry, index) => (
                   <div key={index} className={`${styles.chatMessage} ${entry.role === 'user' ? styles.userMessage : styles.modelMessage}`}>
@@ -1082,6 +1107,13 @@ function TaskCard({ title, onTitleChange, onSubmit, onDelete }: any) {
 
 function SessionLogViewer() {
   const { sessionRef, history, sessionLoading, metadata } = useSessionContext()!;
+  const effectiveStatus = useMemo(() => {
+    if (!metadata) return null;
+    if (metadata.status === "running" && !metadata.runnerInstanceId) {
+      return "failed";
+    }
+    return metadata.status;
+  }, [metadata]);
   
   const collapsedHistory = useMemo(() => {
     let result: HistoryItem[] = [];
@@ -1132,7 +1164,7 @@ function SessionLogViewer() {
           {collapsedHistory.map((item, index) => (
             <HistoryItemRenderer key={index} item={item} />
           ))}
-          {metadata?.status === "running" && (
+          {effectiveStatus === "running" && (
             <Flex align="center" gap="2" mt="4">
               <Spinner />
               <Text size="2" color="gray">Task is running...</Text>
@@ -1141,12 +1173,12 @@ function SessionLogViewer() {
         </div>
       </div>
       <div className={styles.bottomActions} style={{ padding: '16px', borderTop: '1px solid var(--gray-5)' }}>
-        {(metadata?.status === "pending" || metadata?.status === "running" || metadata?.status === "blocked") && (
+        {(effectiveStatus === "pending" || effectiveStatus === "running" || effectiveStatus === "blocked") && (
           <PromptBox
             className={styles.promptBox}
             onSubmit={sendPrompt}
             showNotWorkingBuildOption={false}
-            placeholder={metadata?.status === "blocked" ? "Reply to agent" : "Provide realtime guidance"}
+            placeholder={effectiveStatus === "blocked" ? "Reply to agent" : "Provide realtime guidance"}
           />
         )}
       </div>

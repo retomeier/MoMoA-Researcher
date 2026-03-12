@@ -84,6 +84,7 @@ export const SessionList = forwardRef<SessionListHandle, {
   const projectsRef = userInfoRef ? child(userInfoRef, "projects") : undefined;
   
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [sessionIds, setSessionIds] = useState<string[]>([]);
   const [projectIds, setProjectIds] = useState<string[]>([]);
   const [sessions, setSessions] = useState<Record<string, SessionMetadata>>({});
@@ -265,11 +266,23 @@ export const SessionList = forwardRef<SessionListHandle, {
 
   // 1. Fetch Session IDs
   useEffect(() => {
-    if (!sessionsRef) return;
-    let unsub = onValue(sessionsRef, (ss) => {
-      setSessionIds(Object.keys(ss.val() || {}));
+    if (!sessionsRef) {
       setLoaded(true);
-    });
+      return;
+    }
+    let unsub = onValue(
+      sessionsRef,
+      (ss) => {
+        setSessionIds(Object.keys(ss.val() || {}));
+        setLoadError(null);
+        setLoaded(true);
+      },
+      (error) => {
+        console.error("Failed to load sessions", error);
+        setLoadError(error.message);
+        setLoaded(true);
+      }
+    );
     return () => unsub();
   }, [String(sessionsRef)]);
 
@@ -347,6 +360,14 @@ useEffect(() => {
   // 5. Rendering Logic
   if (!loaded) {
     return <Spinner className={styles.loadingSpinner} />;
+  }
+
+  if (loadError) {
+    return (
+      <Text size="1" color="red" className={styles.emptyState}>
+        Failed to load sessions: {loadError}
+      </Text>
+    );
   }
 
   if (sessionIds.length === 0) {

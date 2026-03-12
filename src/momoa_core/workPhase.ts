@@ -15,7 +15,7 @@
  */
 
 import { DEFAULT_GEMINI_FLASH_MODEL, DEFAULT_GEMINI_LITE_MODEL } from "../config/models";
-import { GeminiClient } from "../services/geminiClient";
+import { LlmClient } from "../services/llmClient";
 import { getAssetString, getExpertPrompt, getWorkPhasePrompt, hasExpertPrompt, replaceRuntimePlaceholders, resolvePlaceholdersFromFiles } from "../services/promptManager";
 import { AddEntryOptions, TranscriptManager } from "../services/transcriptManager";
 import { PROJECT_DIFF_ID } from "../tools/implementations/revertFileTool";
@@ -49,7 +49,7 @@ const emptySummary =
  * coordinating interactions between multiple AI agents (experts) and tools.
  */
 export class WorkPhase {
-  private multiAgentGeminiClient: GeminiClient;
+  private multiAgentGeminiClient: LlmClient;
   private sendMessage: (message: string) => void;
   private task: string;
   private initialPrompt: string;

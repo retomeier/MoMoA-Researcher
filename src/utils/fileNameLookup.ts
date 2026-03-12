@@ -15,7 +15,7 @@
  */
 
 import { DEFAULT_GEMINI_LITE_MODEL } from "../config/models";
-import { GeminiClient } from "../services/geminiClient";
+import { LlmClient } from "../services/llmClient";
 import { getAssetString, replaceRuntimePlaceholders } from "../services/promptManager";
 import { removeBacktickFences } from "./markdownUtils";
 
@@ -29,7 +29,7 @@ import { removeBacktickFences } from "./markdownUtils";
 export async function fileNameLookup(
   filename: string | undefined,
   fileContentMap: Map<string, string>,
-  multiAgentGeminiClient: GeminiClient,
+  multiAgentGeminiClient: LlmClient,
 ): Promise<string> {
   // Use optional chaining and the nullish coalescing operator for a concise initial check.
   const trimmedFilename = filename?.trim() ?? "";

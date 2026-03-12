@@ -19,6 +19,7 @@ import { v4 as uuidv4 } from 'uuid';
 import * as http from 'http';
 import { Orchestrator } from './momoa_core/orchestrator.js';
 import { Config, DEFAULT_GEMINI_EMBEDDING_MODEL } from './config/config.js';
+import { resolveModelForProvider } from './config/models.js';
 import { AuthType } from './services/contentGenerator';
 import { randomUUID } from 'crypto';
 import { isBinaryFileSync } from 'isbinaryfile';
@@ -296,7 +297,7 @@ async function handleInitialRequest(clientUUID: string, requestData: InitialRequ
     const requestConfig = new Config({
       sessionId: randomUUID(),
       debugMode: false,
-      model: llmName, 
+      model: resolveModelForProvider(llmName), 
       maxTurns: maxTurns ?? 20,
       assumptions: assumptions,
       embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -307,7 +308,7 @@ async function handleInitialRequest(clientUUID: string, requestData: InitialRequ
 
     await requestConfig.refreshAuth(AuthType.USE_GEMINI);
 
-    const geminiClient = await requestConfig.getGeminiClient();
+    const geminiClient = await requestConfig.getLlmClient();
 
     const controller = new AbortController();
     const sendMessageCallback = (message: string) => sendMessage(clientUUID, message);
@@ -362,7 +363,7 @@ async function handleInitialRequest(clientUUID: string, requestData: InitialRequ
     orchestratorInstances.set(clientUUID, orchestrator);
     abortControllers.set(clientUUID, controller);
 
-    console.log(`LOGGING: Invoking orchestrator for client ${clientUUID} using model ${llmName}`);
+    console.log(`LOGGING: Invoking orchestrator for client ${clientUUID} using model ${resolveModelForProvider(llmName)}`);
     sendMessage(clientUUID, JSON.stringify({ status: 'WORK_LOG', message: `# Orchestrator invoked successfully:\n${prompt}\n\n` }));
 
     // 3. Run the orchestrator asynchronously

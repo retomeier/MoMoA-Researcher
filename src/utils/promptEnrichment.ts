@@ -16,7 +16,7 @@
 
 import { Part } from "@google/genai";
 import { DEFAULT_GEMINI_PRO_MODEL } from "../config/models";
-import { GeminiClient } from "../services/geminiClient";
+import { LlmClient } from "../services/llmClient";
 import { getAssetString, replaceRuntimePlaceholders } from "../services/promptManager";
 import { removeBacktickFences } from "./markdownUtils";
 
@@ -32,7 +32,7 @@ export async function enrichPrompt(
   OriginalPrompt: string,
   Assumptions: string,
   spec: string,
-  multiAgentGeminiClient: GeminiClient,
+  multiAgentGeminiClient: LlmClient,
   _sendMessage: { (message: string): void },
   image?: string,
   imageMimeType?: string

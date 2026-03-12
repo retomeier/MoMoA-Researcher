@@ -19,3 +19,21 @@ export const DEFAULT_GEMINI_PRO_MODEL = 'gemini-3.1-pro-preview';
 export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_LITE_MODEL = 'gemini-3.1-flash-lite-preview';
 export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
+
+export function getConfiguredLlmProvider(): string {
+  return (process.env.LLM_PROVIDER || "gemini").toLowerCase();
+}
+
+export function getConfiguredDefaultModel(): string {
+  if (getConfiguredLlmProvider() === "openai-compatible") {
+    return process.env.OPENAI_MODEL || DEFAULT_GEMINI_MODEL;
+  }
+  return DEFAULT_GEMINI_MODEL;
+}
+
+export function resolveModelForProvider(requestedModel?: string): string {
+  if (getConfiguredLlmProvider() === "openai-compatible") {
+    return process.env.OPENAI_MODEL || requestedModel || DEFAULT_GEMINI_MODEL;
+  }
+  return requestedModel || DEFAULT_GEMINI_MODEL;
+}

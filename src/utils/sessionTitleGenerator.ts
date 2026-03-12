@@ -15,11 +15,11 @@
  */
 
 import { DEFAULT_GEMINI_LITE_MODEL } from "../config/models";
-import { GeminiClient } from "../services/geminiClient";
+import { LlmClient } from "../services/llmClient";
 
 export async function generateSessionTitle(
   userPrompt: string,
-  geminiClient: GeminiClient
+  geminiClient: LlmClient
 ): Promise<string> {
   let prompt = `
 Please provide a concise and descriptive title for the following programming task or project prompt. The title should be brief, ideally under 10 words, and should capture the essence of the task. Do not use

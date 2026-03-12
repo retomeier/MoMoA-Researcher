@@ -21,7 +21,7 @@ import { spawn } from 'child_process';
 import { MultiAgentTool } from '../multiAgentTool.js';
 import { MultiAgentToolResult, MultiAgentToolContext, ToolParsingResult } from '../../momoa_core/types.js';
 import { addDynamicallyRelevantFile, updateFileEntry } from '../../utils/fileAnalysis.js';
-import { MAX_MEM_PERCENTAGE, MAX_SCRIPT_EXECUTION_TIMEOUT } from '../../config/config.js';
+import { MAX_MEM_PERCENTAGE, MAX_SCRIPT_EXECUTION_TIMEOUT } from '../../config/runtimeConstants.js';
 
 const MAX_TOTAL_RUNS = 200;
 const TIMEOUT = MAX_SCRIPT_EXECUTION_TIMEOUT;

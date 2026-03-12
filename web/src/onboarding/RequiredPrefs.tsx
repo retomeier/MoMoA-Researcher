@@ -13,40 +13,57 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
-import { Prefs, usePrefsContext } from "@/util/PrefsProvider";
-import { Flex, TextField, Tooltip } from "@radix-ui/themes";
+import { Prefs, RuntimeConfig, usePrefsContext } from "@/util/PrefsProvider";
+import { Flex, Text, TextField, Tooltip } from "@radix-ui/themes";
 import { GithubIcon, KeyIcon } from "lucide-react";
 
-export function areRequiredPrefsSet(prefs: Prefs) {
-  return (
-    !!prefs.geminiApiKey
-    // !!prefs.julesApiKey &&
-    // !!prefs.githubToken &&
-    // !!prefs.githubScratchPad
-  );
+export function areRequiredPrefsSet(
+  prefs: Prefs,
+  runtimeConfig?: RuntimeConfig | null
+) {
+  if (runtimeConfig?.llmProvider === "openai-compatible") {
+    return !!runtimeConfig.hasOpenAIApiKey;
+  }
+  return !!prefs.geminiApiKey || !!runtimeConfig?.hasGeminiApiKey;
 }
 
 export function RequiredPrefs() {
-  const { prefs, updatePrefs } = usePrefsContext();
+  const { prefs, runtimeConfig, updatePrefs } = usePrefsContext();
+  const geminiConfigured = !!prefs.geminiApiKey || !!runtimeConfig?.hasGeminiApiKey;
+  const githubConfigured = !!prefs.githubToken || !!runtimeConfig?.hasGithubToken;
+  const usesOpenAICompatibleProvider =
+    runtimeConfig?.llmProvider === "openai-compatible";
   return (
     <Flex direction="column" style={{ width: "100%" }} gap="2">
       <Flex direction="column" gap="2">
-        <TextField.Root
-          value={prefs.geminiApiKey || ""}
-          placeholder="Gemini API key"
-          onChange={(ev) =>
-            updatePrefs({
-              geminiApiKey: ev.currentTarget.value,
-            })
-          }
-          onFocus={(ev) => ev.currentTarget.select()}
-        >
-          <TextField.Slot>
-            <KeyIcon size={16} />
-          </TextField.Slot>
-        </TextField.Root>
+        {!usesOpenAICompatibleProvider && (
+          <>
+            <TextField.Root
+              value={prefs.geminiApiKey || ""}
+              placeholder="Gemini API key"
+              onChange={(ev) =>
+                updatePrefs({
+                  geminiApiKey: ev.currentTarget.value,
+                })
+              }
+              onFocus={(ev) => ev.currentTarget.select()}
+            >
+              <TextField.Slot>
+                <KeyIcon size={16} />
+              </TextField.Slot>
+            </TextField.Root>
+            {runtimeConfig?.hasGeminiApiKey && !prefs.geminiApiKey && (
+              <Text size="1" color="gray">
+                Gemini API key is already available from the server environment.
+              </Text>
+            )}
+          </>
+        )}
+        {usesOpenAICompatibleProvider && (
+          <Text size="1" color="gray">
+            OpenAI-compatible mode is active. The server-side provider credentials are used instead of a Gemini API key.
+          </Text>
+        )}
         <TextField.Root
           value={prefs.githubToken || ""}
           placeholder="GitHub token"
@@ -63,6 +80,16 @@ export function RequiredPrefs() {
             </Tooltip>
           </TextField.Slot>
         </TextField.Root>
+        {runtimeConfig?.hasGithubToken && !prefs.githubToken && (
+          <Text size="1" color="gray">
+            GitHub token is already available from the server environment.
+          </Text>
+        )}
+        {(geminiConfigured || githubConfigured) && (
+          <Text size="1" color="gray">
+            Values entered here override the server environment for this browser.
+          </Text>
+        )}
       </Flex>
     </Flex>
   );

@@ -22,6 +22,7 @@ import fs from "fs";
 import { isBinaryFileSync } from "isbinaryfile";
 import path from "path";
 import { Config, DEFAULT_GEMINI_EMBEDDING_MODEL } from "./config/config.js";
+import { resolveModelForProvider } from "./config/models.js";
 import { ProjectAnalysisResult } from "./momoa_core/types.js";
 import { Orchestrator } from "./momoa_core/orchestrator.js";
 import { AuthType } from "./services/contentGenerator";
@@ -43,7 +44,9 @@ import { resolveProjectSpecification } from "./utils/projectSpecResolver.js";
 
 // firebase config
 let appOptions: AppOptions = {
-  databaseURL: "https://threeplabs-default-rtdb.firebaseio.com/",
+  databaseURL:
+    process.env.FIREBASE_DATABASE_URL ||
+    "https://momoa-a2901-default-rtdb.europe-west1.firebasedatabase.app/",
 };
 if (process.env.NODE_ENV === "development") {
   const sa = fs.readFileSync(
@@ -75,6 +78,16 @@ const runnerInstanceId = randomUUID();
 
 const SERVER_MAX_DURATION_MS = 55 * 60 * 1000;
 const SERVER_GRACE_PERIOD_MS = 5 * 60 * 1000;
+
+function ignoreAbortedFirebaseWrite(
+  operation: PromiseLike<unknown>,
+  context: string
+): void {
+  Promise.resolve(operation).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[Firebase] Ignored write failure during ${context}: ${message}`);
+  });
+}
 
 export async function runSession(
   sessionId: string,
@@ -110,22 +123,32 @@ export async function runSession(
   // set ourselves as the active runner for this session, and when this process exits, clear the
   // active runner info for this session... this also handles reconnections
   let disc: OnDisconnect | undefined;
-  db.ref(".info/connected").on("value", (snapshot) => {
+  const connectedRef = db.ref(".info/connected");
+  const connectedListener = connectedRef.on("value", (snapshot) => {
     let connected = !!snapshot.val();
     if (connected) {
-      runnerRef.set(runnerInstanceId);
+      ignoreAbortedFirebaseWrite(
+        runnerRef.set(runnerInstanceId),
+        `setting runner instance for session ${sessionId}`
+      );
       disc?.cancel();
       disc = runnerRef.onDisconnect();
-      disc.set(null);
+      ignoreAbortedFirebaseWrite(
+        disc.set(null),
+        `registering onDisconnect for session ${sessionId}`
+      );
     }
   });
 
   // listen for incoming messages (also look at all pending actions on first subscribe)
   let actionQueueRef = sessionRef.child("actionQueue");
-  actionQueueRef.on("child_added", async (snapshot) => {
+  const actionQueueListener = actionQueueRef.on("child_added", async (snapshot) => {
     const action = snapshot.val();
     handleIncomingMessage(sessionId, action);
-    actionQueueRef.child(snapshot.key!).remove();
+    ignoreAbortedFirebaseWrite(
+      actionQueueRef.child(snapshot.key!).remove(),
+      `removing action queue item for session ${sessionId}`
+    );
   });
 
   let tornDown = false;
@@ -134,15 +157,23 @@ export async function runSession(
     console.log(`Session ${sessionId} cleaning up because: ${reason}`);
     tornDown = true;
     runningSessions.delete(sessionId);
+    connectedRef.off("value", connectedListener);
+    actionQueueRef.off("child_added", actionQueueListener);
     disc?.cancel();
     disc = undefined;
     sessionCompleteDeferred.resolve();
-    runnerRef.set(null);
+    ignoreAbortedFirebaseWrite(
+      runnerRef.set(null),
+      `clearing runner instance for session ${sessionId}`
+    );
   };
 
   session.bus.addEventListener("sessionComplete", () => teardown("Completed"));
   session.abort.signal.addEventListener("abort", () => {
-    sessionRef.child("metadata").update({ status: "failed" });
+    ignoreAbortedFirebaseWrite(
+      sessionRef.child("metadata").update({ status: "failed" }),
+      `marking session ${sessionId} as failed after abort`
+    );
     sendMessage(
       sessionId,
       JSON.stringify({
@@ -165,20 +196,30 @@ export async function runSession(
 function sendMessage(sessionId: string, message: string): void {
   let sessionRef = db.ref(SESSION_ROOT_PATH).child(sessionId);
   let parsed = JSON.parse(message) as OutgoingMessage;
-  sessionRef.child("history").push({
-    ...parsed,
-    timestamp: Date.now(),
-    runnerInstanceId,
-  } satisfies HistoryItem);
-  if (parsed.status === "COMPLETE_RESULT") {
-    sessionRef
-      .child("metadata")
-      .update({ modifiedAt: Date.now(), status: "complete" });
-    sessionRef.child("result").set({
+  const timestamp = Date.now();
+  ignoreAbortedFirebaseWrite(
+    sessionRef.child("history").push({
       ...parsed,
-      timestamp: Date.now(),
+      timestamp,
       runnerInstanceId,
-    });
+    } satisfies HistoryItem),
+    `appending history for session ${sessionId}`
+  );
+  if (parsed.status === "COMPLETE_RESULT") {
+    ignoreAbortedFirebaseWrite(
+      sessionRef
+        .child("metadata")
+        .update({ modifiedAt: timestamp, status: "complete" }),
+      `marking complete metadata for session ${sessionId}`
+    );
+    ignoreAbortedFirebaseWrite(
+      sessionRef.child("result").set({
+        ...parsed,
+        timestamp,
+        runnerInstanceId,
+      }),
+      `writing result for session ${sessionId}`
+    );
     const session = runningSessions.get(sessionId);
     // Check if this is an Analyzer session and has a projectId
     if (session && session.mode === ServerMode.ANALYZER && session.projectId) {
@@ -213,43 +254,55 @@ function sendMessage(sessionId: string, message: string): void {
       }
     }
   } else if (parsed.status === "HITL_QUESTION") {
-    sessionRef
-      .child("metadata")
-      .update({ modifiedAt: Date.now(), status: "blocked" });
+    ignoreAbortedFirebaseWrite(
+      sessionRef
+        .child("metadata")
+        .update({ modifiedAt: Date.now(), status: "blocked" }),
+      `marking session ${sessionId} as blocked`
+    );
   } else if (parsed.status === "PROGRESS_UPDATES") {
-    sessionRef.child("metadata").transaction((currentData) => {
-      if (currentData) {
-        currentData.latestUpdate = parsed.completed_status_message || null;
-        currentData.modifiedAt = Date.now();
-        // Only mark as running if it hasn't already completed/failed
-        if (currentData.status !== "complete") {
-          currentData.status = "running";
+    ignoreAbortedFirebaseWrite(
+      sessionRef.child("metadata").transaction((currentData) => {
+        if (currentData) {
+          currentData.latestUpdate = parsed.completed_status_message || null;
+          currentData.modifiedAt = Date.now();
+          // Only mark as running if it hasn't already completed/failed
+          if (currentData.status !== "complete") {
+            currentData.status = "running";
+          }
         }
-      }
-      return currentData;
-    });
+        return currentData;
+      }),
+      `updating progress metadata for session ${sessionId}`
+    );
   } else if (parsed.status === "ERROR") {
     // Explicitly handle ERRORs so they don't fall into the "running" catch-all
-    sessionRef.child("metadata").transaction((currentData) => {
-      if (currentData) {
-        currentData.modifiedAt = Date.now();
-        // If it was already marked complete, don't let a late timeout overwrite it
-        if (currentData.status !== "complete") {
-          currentData.status = "failed";
+    ignoreAbortedFirebaseWrite(
+      sessionRef.child("metadata").transaction((currentData) => {
+        if (currentData) {
+          currentData.modifiedAt = Date.now();
+          // If it was already marked complete, don't let a late timeout overwrite it
+          if (currentData.status !== "complete") {
+            currentData.status = "failed";
+          }
         }
-      }
-      return currentData;
-    });
+        return currentData;
+      }),
+      `marking error metadata for session ${sessionId}`
+    );
   } else if (parsed.status !== "WORK_LOG") {
-    sessionRef.child("metadata").transaction((currentData) => {
-      if (currentData) {
-        currentData.modifiedAt = Date.now();
-        if (currentData.status !== "complete") {
-          currentData.status = "running";
+    ignoreAbortedFirebaseWrite(
+      sessionRef.child("metadata").transaction((currentData) => {
+        if (currentData) {
+          currentData.modifiedAt = Date.now();
+          if (currentData.status !== "complete") {
+            currentData.status = "running";
+          }
         }
-      }
-      return currentData;
-    });
+        return currentData;
+      }),
+      `updating generic metadata for session ${sessionId}`
+    );
   }
 }
 
@@ -556,7 +609,7 @@ async function handleInitialRequest(
     const requestConfig = new Config({
       sessionId: randomUUID(),
       debugMode: false,
-      model: llmName, 
+      model: resolveModelForProvider(llmName),
       maxTurns: maxTurns ?? 20,
       assumptions: combinedAssumptions,
       embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -575,7 +628,7 @@ async function handleInitialRequest(
       googleApiKey: secrets.geminiApiKey,
     });
 
-    const geminiClient = await requestConfig.getGeminiClient();
+    const geminiClient = await requestConfig.getLlmClient();
 
     const sendMessageCallback = (message: string) =>
       sendMessage(clientUUID, message);
@@ -719,7 +772,7 @@ if (githubUrl) {
     session.runner = runner;
 
     console.log(
-      `LOGGING: Invoking ${runnerName} for client ${clientUUID} using model ${llmName}`
+      `LOGGING: Invoking ${runnerName} for client ${clientUUID} using model ${resolveModelForProvider(llmName)}`
     );
     sendMessage(
       clientUUID,
@@ -732,7 +785,10 @@ if (githubUrl) {
     // 2.5b Update session title
     generateSessionTitle(requestData.prompt, geminiClient).then((title) => {
       let sessionRef = db.ref(SESSION_ROOT_PATH).child(clientUUID);
-      sessionRef.child("metadata").update({ title });
+      ignoreAbortedFirebaseWrite(
+        sessionRef.child("metadata").update({ title }),
+        `updating session ${clientUUID} title`
+      );
     });
 
     // 3. Run the runner asynchronously
@@ -757,7 +813,10 @@ if (githubUrl) {
         session.bus.dispatchEvent(new Event("sessionComplete"));
         const sessionRef = db.ref(SESSION_ROOT_PATH).child(clientUUID);
         // TODO: set status based on success/failure
-        sessionRef.child("metadata").update({ status: "complete" });
+        ignoreAbortedFirebaseWrite(
+          sessionRef.child("metadata").update({ status: "complete" }),
+          `marking session ${clientUUID} complete`
+        );
       });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

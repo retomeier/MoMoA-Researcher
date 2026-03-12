@@ -15,6 +15,7 @@
  */
 
 import { createContext, useContext, useState } from "react";
+import { useEffect } from "react";
 
 const PREFS_KEY = "momoa-researcher-app-prefs";
 
@@ -30,6 +31,19 @@ export type Prefs = {
   e2BApiKey?: string;
 };
 
+export type RuntimeConfig = {
+  llmProvider: string;
+  defaultModel: string;
+  hasGeminiApiKey: boolean;
+  hasOpenAIApiKey: boolean;
+  hasGoogleApiKey: boolean;
+  hasGithubToken: boolean;
+  hasJulesApiKey: boolean;
+  hasStitchApiKey: boolean;
+  hasE2BApiKey: boolean;
+  hasGithubScratchPadRepo: boolean;
+};
+
 const initialPrefs: Prefs = (() => {
   let prefsString = localStorage.getItem(PREFS_KEY);
   if (prefsString) {
@@ -42,6 +56,8 @@ const initialPrefs: Prefs = (() => {
 
 type PrefsContext = {
   prefs: Partial<Prefs>;
+  runtimeConfig: RuntimeConfig | null;
+  runtimeConfigLoaded: boolean;
   updatePrefs: (updates: Partial<Prefs>) => void;
 };
 
@@ -53,6 +69,32 @@ export function usePrefsContext() {
 
 export function PrefsProvider({ children }: React.PropsWithChildren) {
   const [prefs, setPrefs] = useState<Prefs>(initialPrefs);
+  const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig | null>(null);
+  const [runtimeConfigLoaded, setRuntimeConfigLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/s/runtime-config")
+      .then((response) => response.json())
+      .then((config: RuntimeConfig) => {
+        if (!cancelled) {
+          setRuntimeConfig(config);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load runtime config", error);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setRuntimeConfigLoaded(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function updatePrefs(updates: Partial<Prefs>) {
     setPrefs((prefs) => {
@@ -66,7 +108,9 @@ export function PrefsProvider({ children }: React.PropsWithChildren) {
   }
 
   return (
-    <PrefsContext.Provider value={{ prefs, updatePrefs }}>
+    <PrefsContext.Provider
+      value={{ prefs, runtimeConfig, runtimeConfigLoaded, updatePrefs }}
+    >
       {children}
     </PrefsContext.Provider>
   );

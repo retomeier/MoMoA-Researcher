@@ -28,30 +28,23 @@ import { ApiPolicyManager } from './apiPolicyManager.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { TranscriptManager } from './transcriptManager.js';
 import { ContentGenerator, createContentGenerator, ContentGeneratorConfig, AuthType, resolveApiKeyForModel } from './contentGenerator.js';
-import { FormattedTranscriptEntry, GeminiClientConfig, MarkerPair, ToolFunctionDeclaration } from '../momoa_core/types.js';
+import { FormattedTranscriptEntry, GeminiClientConfig, MarkerPair } from '../momoa_core/types.js';
 import { LlmBlockedError } from '../shared/errors.js';
+import {
+  LlmClient,
+  LlmGenerateOptions,
+  LlmPromptPart,
+  TokenUsageStats,
+} from './llmClient.js';
 
 const MAX_ATTEMPTS = 6;
-
-/**
- * Interface for options passed to content generation methods.
- */
-export interface GenerateContentOptions {
-  model?: string;
-  temperature?: number;
-  enableThinking?: boolean;
-  enableGrounding?: boolean;
-  signal?: AbortSignal; 
-  responseMimeType?: string;
-  tools?: ToolFunctionDeclaration[]; 
-}
 
 /**
  * Client for interacting with the Gemini API in a multi-agent context.
  * Manages API calls, applies policy (rate limiting, backoff),
  * and integrates with chat history and telemetry.
  */
-export class GeminiClient {
+export class GeminiClient implements LlmClient {
   private contentGenerators = new Map<string, Promise<ContentGenerator>>();
   private readonly apiPolicyManager: ApiPolicyManager;
   private readonly config: GeminiClientConfig;
@@ -121,11 +114,7 @@ export class GeminiClient {
    * @returns A Map where the key is the model name and the value is an
    * object containing total input, output, and cached-input tokens.
    */
-  public getTokenUsage(): Map<string, { 
-    inputTokens: number, 
-    outputTokens: number, 
-    cachedInputTokens: number 
-  }> {
+  public getTokenUsage(): Map<string, TokenUsageStats> {
     return this.tokenUsage;
   }
 
@@ -690,8 +679,8 @@ export class GeminiClient {
    * Sends a single "one-shot" message to the LLM.
    */
   public async sendOneShotMessage(
-    prompt: string | Part[],
-    options?: GenerateContentOptions,
+    prompt: string | LlmPromptPart[],
+    options?: LlmGenerateOptions,
   ): Promise<GenerateContentResponse> {
     const model = options?.model || DEFAULT_GEMINI_FLASH_MODEL;
     
@@ -712,7 +701,7 @@ export class GeminiClient {
     const contents: Content[] = [
       {
         role: 'user',
-        parts: typeof prompt === 'string' ? [{ text: prompt }] : prompt,
+        parts: typeof prompt === 'string' ? [{ text: prompt }] : (prompt as Part[]),
       },
     ];
 
@@ -726,7 +715,7 @@ export class GeminiClient {
 
   public async sendTranscriptMessage(
     transcriptManager: TranscriptManager | undefined,
-    options?: GenerateContentOptions,
+    options?: LlmGenerateOptions,
   ): Promise<GenerateContentResponse> {
     const model = options?.model || DEFAULT_GEMINI_FLASH_MODEL;
 

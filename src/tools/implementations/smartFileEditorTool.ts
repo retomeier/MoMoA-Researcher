@@ -27,7 +27,7 @@ import { fuzzyReplace } from '../../utils/fuzzyStringReplacer.js';
 import { updateDiffInAllTranscripts } from './revertFileTool.js';
 import { isLockFile } from '../../utils/diffGenerator.js';
 import { createTwoFilesPatch } from 'diff';
-import { logFilename } from '../../config/config.js';
+import { logFilename } from '../../config/runtimeConstants.js';
 
 const filenameStart = `DOC/EDIT{`;
 const filenameEnd = `}\nTO\u005fREPLACE`;
