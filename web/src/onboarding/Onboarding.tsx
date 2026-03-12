@@ -33,6 +33,7 @@ export function OnboardGate({ children }: React.PropsWithChildren) {
   const { user, hasAccess, authLoaded } = useAuthContext();
   const { prefs } = usePrefsContext();
   const [continueKey, setContinueKey] = useState(0);
+  const hasLocalDevAccessBypass = window.location.hostname === "localhost";
   // only check on first mount to avoid kicking users out if they delete prefs
   const initialConfigDone = useMemo(
     () => areRequiredPrefsSet(prefs),
@@ -42,7 +43,7 @@ export function OnboardGate({ children }: React.PropsWithChildren) {
 
   if (!authLoaded) return <Loading />;
   if (!user) return <LoginScreen />;
-  if (!hasAccess) return <InviteCodeScreen />;
+  if (!hasAccess && !hasLocalDevAccessBypass) return <InviteCodeScreen />;
   if (!termsAccepted) return <TermsScreen onContinue={() => setContinueKey((k) => k + 1)} />;
   if (!initialConfigDone)
     return (
