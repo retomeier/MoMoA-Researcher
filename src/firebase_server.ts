@@ -22,6 +22,7 @@ import fs from "fs";
 import { isBinaryFileSync } from "isbinaryfile";
 import path from "path";
 import { Config, DEFAULT_GEMINI_EMBEDDING_MODEL } from "./config/config.js";
+import { resolveModelForProvider } from "./config/models.js";
 import { ProjectAnalysisResult } from "./momoa_core/types.js";
 import { Orchestrator } from "./momoa_core/orchestrator.js";
 import { AuthType } from "./services/contentGenerator";
@@ -558,7 +559,7 @@ async function handleInitialRequest(
     const requestConfig = new Config({
       sessionId: randomUUID(),
       debugMode: false,
-      model: llmName, 
+      model: resolveModelForProvider(llmName),
       maxTurns: maxTurns ?? 20,
       assumptions: combinedAssumptions,
       embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -721,7 +722,7 @@ if (githubUrl) {
     session.runner = runner;
 
     console.log(
-      `LOGGING: Invoking ${runnerName} for client ${clientUUID} using model ${llmName}`
+      `LOGGING: Invoking ${runnerName} for client ${clientUUID} using model ${resolveModelForProvider(llmName)}`
     );
     sendMessage(
       clientUUID,

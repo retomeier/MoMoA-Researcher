@@ -21,6 +21,7 @@ import cors from 'cors';
 import path from 'path';
 import process from 'process';
 import { getAuth } from 'firebase-admin/auth';
+import { DEFAULT_GEMINI_MODEL, getConfiguredDefaultModel, getConfiguredLlmProvider } from './config/models.js';
 import { initializeWebSocketServer } from './websocket_server';
 import { abortSession, runSession, deleteProjectAndDependencies } from './firebase_server';
 
@@ -28,6 +29,24 @@ import { abortSession, runSession, deleteProjectAndDependencies } from './fireba
 
 const app: Application = express();
 const port: number = process.env.PORT ? parseInt(process.env.PORT, 10) : 3007;
+const llmProvider = getConfiguredLlmProvider();
+
+function getLlmStartupSummary(): string[] {
+  if (llmProvider === "openai-compatible") {
+    return [
+      `provider=${llmProvider}`,
+      `model=${getConfiguredDefaultModel() || "unset"}`,
+      `baseURL=${process.env.OPENAI_BASE_URL || "unset"}`,
+      `apiKey=${process.env.OPENAI_API_KEY ? "set" : "missing"}`,
+    ];
+  }
+
+  return [
+    `provider=gemini`,
+    `model=${getConfiguredDefaultModel() || DEFAULT_GEMINI_MODEL}`,
+    `apiKey=${process.env.GEMINI_API_KEY ? "set" : "missing"}`,
+  ];
+}
 
 // --- Server Initialization ---
 
@@ -123,4 +142,5 @@ app.get('*all', (_req, res) => {
 
 server.listen(port, () => {
   console.log(`🚀 Server with WebSocket support is listening at http://localhost:${port}`);
+  console.log(`[LLM] ${getLlmStartupSummary().join(" | ")}`);
 });

@@ -17,6 +17,8 @@
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  getConfiguredLlmProvider,
+  resolveModelForProvider,
 } from "./models.js";
 import {
   AuthType,
@@ -25,6 +27,7 @@ import {
 } from "../services/contentGenerator.js";
 import { GeminiClient } from "../services/geminiClient.js";
 import { LlmClient } from "../services/llmClient.js";
+import { OpenAICompatibleClient } from "../services/openaiCompatibleClient.js";
 import { ApiPolicyManager } from "../services/apiPolicyManager.js";
 import { InfrastructureContext } from "../momoa_core/types.js";
 import { getAssetString } from "../services/promptManager.js";
@@ -90,8 +93,40 @@ export class Config implements InfrastructureContext {
     );
     this.apiKey = this.contentGeneratorConfig.apiKey || '';
 
-    const apiPolicyManager = new ApiPolicyManager();
-    this.llmClient = new GeminiClient(this, apiPolicyManager);
+    const llmProvider = getConfiguredLlmProvider();
+
+    if (llmProvider === "openai-compatible") {
+      const apiKey =
+        options?.openaiApiKey ||
+        process.env.OPENAI_API_KEY ||
+        "";
+      const baseURL = process.env.OPENAI_BASE_URL || "";
+      const model = resolveModelForProvider(
+        options?.openaiModel || this.contentGeneratorConfig?.model || this.model
+      );
+
+      if (!apiKey) {
+        throw new Error(
+          "OPENAI_API_KEY is required when LLM_PROVIDER=openai-compatible."
+        );
+      }
+
+      if (!baseURL) {
+        throw new Error(
+          "OPENAI_BASE_URL is required when LLM_PROVIDER=openai-compatible."
+        );
+      }
+
+      this.apiKey = apiKey;
+      this.llmClient = new OpenAICompatibleClient({
+        apiKey,
+        baseURL,
+        model,
+      });
+    } else {
+      const apiPolicyManager = new ApiPolicyManager();
+      this.llmClient = new GeminiClient(this, apiPolicyManager);
+    }
 
     // Reset the session flag since we're explicitly changing auth and using default model
     this.modelSwitchedDuringSession = false;
