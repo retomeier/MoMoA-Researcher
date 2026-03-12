@@ -32,7 +32,10 @@ export type Prefs = {
 };
 
 export type RuntimeConfig = {
+  llmProvider: string;
+  defaultModel: string;
   hasGeminiApiKey: boolean;
+  hasOpenAIApiKey: boolean;
   hasGoogleApiKey: boolean;
   hasGithubToken: boolean;
   hasJulesApiKey: boolean;

@@ -21,7 +21,10 @@ import cors from 'cors';
 import path from 'path';
 import process from 'process';
 import { getAuth } from 'firebase-admin/auth';
-import { DEFAULT_GEMINI_MODEL, getConfiguredDefaultModel, getConfiguredLlmProvider } from './config/models.js';
+import { Config, DEFAULT_GEMINI_EMBEDDING_MODEL } from './config/config.js';
+import { DEFAULT_GEMINI_MODEL, getConfiguredDefaultModel, getConfiguredLlmProvider, resolveModelForProvider } from './config/models.js';
+import { AuthType } from './services/contentGenerator.js';
+import { TranscriptManager } from './services/transcriptManager.js';
 import { initializeWebSocketServer } from './websocket_server';
 import { abortSession, runSession, deleteProjectAndDependencies } from './firebase_server';
 
@@ -59,7 +62,10 @@ initializeWebSocketServer(port, server);
 app.use(cors());
 app.get('/s/runtime-config', (_req, res) => {
     return res.json({
+        llmProvider,
+        defaultModel: getConfiguredDefaultModel(),
         hasGeminiApiKey: !!process.env.GEMINI_API_KEY,
+        hasOpenAIApiKey: !!process.env.OPENAI_API_KEY,
         hasGoogleApiKey: !!process.env.GOOGLE_API_KEY,
         hasGithubToken: !!process.env.GITHUB_TOKEN,
         hasJulesApiKey: !!process.env.JULES_API_KEY,
@@ -67,6 +73,61 @@ app.get('/s/runtime-config', (_req, res) => {
         hasE2BApiKey: !!process.env.E2B_API_KEY,
         hasGithubScratchPadRepo: !!process.env.GITHUB_SCRATCHPAD_REPO,
     });
+});
+app.post('/s/llm/oneshot', express.json({ limit: '10mb', type: '*/*' }), async (req, res) => {
+    try {
+        const { prompt, options } = req.body || {};
+        const model = resolveModelForProvider(options?.model);
+
+        const requestConfig = new Config({
+            sessionId: `llm-oneshot-${Date.now()}`,
+            debugMode: false,
+            model,
+            embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
+            cwd: process.cwd(),
+            question: '',
+            fullContext: false,
+        });
+
+        await requestConfig.refreshAuth(AuthType.USE_GEMINI, req.body?.authOptions);
+        const llmClient = await requestConfig.getLlmClient();
+        const response = await llmClient.sendOneShotMessage(prompt, {
+            ...options,
+            model,
+        });
+        return res.json(response);
+    } catch (error) {
+        return res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+});
+app.post('/s/llm/chat', express.json({ limit: '10mb', type: '*/*' }), async (req, res) => {
+    try {
+        const { transcript, options } = req.body || {};
+        const model = resolveModelForProvider(options?.model);
+        const requestConfig = new Config({
+            sessionId: `llm-chat-${Date.now()}`,
+            debugMode: false,
+            model,
+            embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
+            cwd: process.cwd(),
+            question: '',
+            fullContext: false,
+        });
+
+        await requestConfig.refreshAuth(AuthType.USE_GEMINI, req.body?.authOptions);
+        const llmClient = await requestConfig.getLlmClient();
+        const transcriptManager = new TranscriptManager({ context: requestConfig });
+        for (const entry of transcript || []) {
+            transcriptManager.addEntry(entry.role, entry.parts, { ephemeral: entry.ephemeral });
+        }
+        const response = await llmClient.sendTranscriptMessage(transcriptManager, {
+            ...options,
+            model,
+        });
+        return res.json(response);
+    } catch (error) {
+        return res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
 });
 app.post('/s/run-session', express.json({ type: '*/*' }), async (req, res) => {
     const { sessionId } = req.body;

@@ -151,7 +151,7 @@ export const ResearchProjectPage: React.FC = () => {
   const { projectId, sessionId } = useParams<ProjectRouteParams>();
   const navigate = useNavigate();
   const { user } = useAuthContext();
-  const { prefs } = usePrefsContext();
+  const { prefs, runtimeConfig } = usePrefsContext();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [project, setProject] = useState<ProjectMetadata | null>(null);
@@ -309,7 +309,7 @@ export const ResearchProjectPage: React.FC = () => {
   };
 
   const generateProjectDetails = async (summaryText: string) => {
-    if (!prefs.geminiApiKey || !projectId) return;
+    if (!projectId) return;
 
     try {
       const projectNameDescriptionPrompt = `Based on the following task result summary, generate a short, clever "Research Project Name" (max 7 words) and a 1-sentence "Description". 
@@ -318,7 +318,7 @@ export const ResearchProjectPage: React.FC = () => {
               
               Return JSON format: { "title": "...", "description": "..." }`;
 
-      const projectMetaTitle = await sendGeminiOneShot(projectNameDescriptionPrompt, prefs.geminiApiKey);
+      const projectMetaTitle = await sendGeminiOneShot(projectNameDescriptionPrompt, prefs.geminiApiKey || "", runtimeConfig?.defaultModel);
 
       if (projectMetaTitle) {
         const cleanProjectMetaTitle = removeBacktickFences(projectMetaTitle);
@@ -343,7 +343,7 @@ export const ResearchProjectPage: React.FC = () => {
   }, [sessionMeta]);
 
   const handleRefreshProjectDetails = async () => {
-    if (!prefs.geminiApiKey || !projectId || !project) return;
+    if (!projectId || !project) return;
     if (!sessionId) {
       alert("Please select a session first to base the context on.");
       return;
@@ -357,7 +357,7 @@ export const ResearchProjectPage: React.FC = () => {
       const prompt = await buildProjectContextPrompt(projectId, sessionId, project, taskObjective, outputFormat);
 
       // 5. Send to LLM and update DB
-      const projectMetaTitle = await sendGeminiOneShot(prompt.trim(), prefs.geminiApiKey, DEFAULT_GEMINI_LITE_MODEL);
+      const projectMetaTitle = await sendGeminiOneShot(prompt.trim(), prefs.geminiApiKey || "", DEFAULT_GEMINI_LITE_MODEL);
 
       if (projectMetaTitle) {
         const cleanProjectMetaTitle = removeBacktickFences(projectMetaTitle);
@@ -743,7 +743,7 @@ const handleDeleteProject = async () => {
   };
 
 const generateProposedTasks = async (_currentSessionHistoryItems: HistoryItem[]): Promise<string[]> => {
-    if (!prefs.geminiApiKey || !projectId || !project || !sessionId) return [];
+    if (!projectId || !project || !sessionId) return [];
 
     setIsGeneratingTasks(true);
     try {
@@ -762,7 +762,7 @@ const generateProposedTasks = async (_currentSessionHistoryItems: HistoryItem[])
       );
 
       // 3. Send to Gemini
-      const responseText = await sendGeminiOneShot(prompt, prefs.geminiApiKey, DEFAULT_GEMINI_PRO_MODEL);
+      const responseText = await sendGeminiOneShot(prompt, prefs.geminiApiKey || "", DEFAULT_GEMINI_PRO_MODEL);
 
       if (responseText) {
         const cleanText = removeBacktickFences(responseText);

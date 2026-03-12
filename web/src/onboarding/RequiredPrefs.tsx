@@ -21,6 +21,9 @@ export function areRequiredPrefsSet(
   prefs: Prefs,
   runtimeConfig?: RuntimeConfig | null
 ) {
+  if (runtimeConfig?.llmProvider === "openai-compatible") {
+    return !!runtimeConfig.hasOpenAIApiKey;
+  }
   return !!prefs.geminiApiKey || !!runtimeConfig?.hasGeminiApiKey;
 }
 
@@ -28,26 +31,37 @@ export function RequiredPrefs() {
   const { prefs, runtimeConfig, updatePrefs } = usePrefsContext();
   const geminiConfigured = !!prefs.geminiApiKey || !!runtimeConfig?.hasGeminiApiKey;
   const githubConfigured = !!prefs.githubToken || !!runtimeConfig?.hasGithubToken;
+  const usesOpenAICompatibleProvider =
+    runtimeConfig?.llmProvider === "openai-compatible";
   return (
     <Flex direction="column" style={{ width: "100%" }} gap="2">
       <Flex direction="column" gap="2">
-        <TextField.Root
-          value={prefs.geminiApiKey || ""}
-          placeholder="Gemini API key"
-          onChange={(ev) =>
-            updatePrefs({
-              geminiApiKey: ev.currentTarget.value,
-            })
-          }
-          onFocus={(ev) => ev.currentTarget.select()}
-        >
-          <TextField.Slot>
-            <KeyIcon size={16} />
-          </TextField.Slot>
-        </TextField.Root>
-        {runtimeConfig?.hasGeminiApiKey && !prefs.geminiApiKey && (
+        {!usesOpenAICompatibleProvider && (
+          <>
+            <TextField.Root
+              value={prefs.geminiApiKey || ""}
+              placeholder="Gemini API key"
+              onChange={(ev) =>
+                updatePrefs({
+                  geminiApiKey: ev.currentTarget.value,
+                })
+              }
+              onFocus={(ev) => ev.currentTarget.select()}
+            >
+              <TextField.Slot>
+                <KeyIcon size={16} />
+              </TextField.Slot>
+            </TextField.Root>
+            {runtimeConfig?.hasGeminiApiKey && !prefs.geminiApiKey && (
+              <Text size="1" color="gray">
+                Gemini API key is already available from the server environment.
+              </Text>
+            )}
+          </>
+        )}
+        {usesOpenAICompatibleProvider && (
           <Text size="1" color="gray">
-            Gemini API key is already available from the server environment.
+            OpenAI-compatible mode is active. The server-side provider credentials are used instead of a Gemini API key.
           </Text>
         )}
         <TextField.Root
