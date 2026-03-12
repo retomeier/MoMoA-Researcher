@@ -105,10 +105,18 @@ export const useGeminiChat = (projectId: string | undefined, chatContext: string
 
     const [isSending, setIsSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [activityLog, setActivityLog] = useState<string[]>([]);
 
     const updateTranscriptState = useCallback(() => {
         setTranscript(transcriptManager.getTranscript(undefined, true));
     }, [transcriptManager]);
+
+    const logActivity = useCallback((message: string) => {
+        setActivityLog((prev) => {
+            if (prev[prev.length - 1] === message) return prev;
+            return [...prev, message];
+        });
+    }, []);
 
     const projectContextRef = useRef(chatContext);
     useEffect(() => {
@@ -216,6 +224,8 @@ export const useGeminiChat = (projectId: string | undefined, chatContext: string
 
         setError(null);
         setIsSending(true);
+        setActivityLog([]);
+        logActivity('Preparing your message');
 
         try {
             let modelResponseText;
@@ -226,6 +236,7 @@ export const useGeminiChat = (projectId: string | undefined, chatContext: string
 
             while (isToolCall && loopCount < MAX_REACT_STEPS) {
                 loopCount++;
+                logActivity(loopCount === 1 ? 'Sending your question to the model' : 'Continuing the answer with the latest tool results');
 
                 const llmResponse = await fetch("/s/llm/chat", {
                     method: "POST",
@@ -247,6 +258,7 @@ export const useGeminiChat = (projectId: string | undefined, chatContext: string
                 }
 
                 response = await llmResponse.json() as GenerateContentResponse;
+                logActivity('Model responded');
                 const candidate = response.candidates?.[0];
                 const parts = candidate?.content?.parts || [];
 
@@ -258,10 +270,21 @@ export const useGeminiChat = (projectId: string | undefined, chatContext: string
                     })) as unknown as FunctionCall[];
 
                 if (functionCalls.length > 0) {
+                    const toolCall = functionCalls[0];
+                    const toolLabel =
+                        toolCall.name === READ_FILES_TOOL_NAME
+                            ? 'Reading project files'
+                            : toolCall.name === MODIFY_SPEC_TOOL_NAME
+                              ? 'Updating the project specification'
+                              : `Running tool: ${toolCall.name}`;
+
+                    logActivity(toolLabel);
+
                     if (chatRef) {
                         const modelCallRef = push(chatRef);
                         const firebaseKey = modelCallRef.key!;
                         syncedKeysRef.current.add(firebaseKey);
+                        transcriptManager.addEntry(MODEL_ROLE, parts, { documentId: firebaseKey });
                         updateTranscriptState();
                         await set(modelCallRef, { role: MODEL_ROLE, content: parts });
                     } else {
@@ -269,7 +292,6 @@ export const useGeminiChat = (projectId: string | undefined, chatContext: string
                         updateTranscriptState();
                     }
 
-                    const toolCall = functionCalls[0];
                     let toolResult: ToolResult;
 
                     if (toolCall.name === READ_FILES_TOOL_NAME) {
@@ -310,6 +332,8 @@ export const useGeminiChat = (projectId: string | undefined, chatContext: string
                         transcriptManager.addEntry('function', [responsePart]);
                         updateTranscriptState();
                     }
+
+                    logActivity('Tool finished, sending the result back to the model');
                 } else {
                     isToolCall = false;
                     modelResponseText = response.text;
@@ -329,13 +353,16 @@ export const useGeminiChat = (projectId: string | undefined, chatContext: string
             }
 
             if (chatRef && modelResponseText) {
+                logActivity('Writing the answer to chat');
                 const messageData = { role: MODEL_ROLE, content: modelResponseText };
                 const newRef = push(chatRef);
                 const firebaseKey = newRef.key!;
                 syncedKeysRef.current.add(firebaseKey);
+                transcriptManager.addEntry(MODEL_ROLE, modelResponseText, { documentId: firebaseKey });
                 updateTranscriptState();
                 await set(newRef, messageData);
             } else if (!chatRef && modelResponseText) {
+                logActivity('Answer ready');
                 transcriptManager.addEntry(MODEL_ROLE, modelResponseText);
                 updateTranscriptState();
             }
@@ -343,12 +370,13 @@ export const useGeminiChat = (projectId: string | undefined, chatContext: string
             const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred during the API call.';
             console.error('LLM Chat Error:', e);
             setError(errorMessage);
+            logActivity('The request ended with an error');
             transcriptManager.addEntry(MODEL_ROLE, `Error: ${errorMessage}`);
             updateTranscriptState();
         } finally {
             setIsSending(false);
         }
-    }, [isSending, transcriptManager, updateTranscriptState, chatRef, prefs.githubToken, projectId, runtimeConfig?.defaultModel]);
+    }, [isSending, transcriptManager, updateTranscriptState, chatRef, prefs.githubToken, projectId, runtimeConfig?.defaultModel, logActivity]);
 
     const deleteTranscript = useCallback(async () => {
         transcriptManager.clearTranscript();
@@ -383,5 +411,6 @@ export const useGeminiChat = (projectId: string | undefined, chatContext: string
         error,
         transcript,
         deleteTranscript,
+        activityLog,
     };
 };
