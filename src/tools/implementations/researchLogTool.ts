@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { logFilename } from "../../config/config";
+import { logFilename } from "../../config/runtimeConstants.js";
 import { MultiAgentToolContext, MultiAgentToolResult, ToolParsingResult } from "../../momoa_core/types";
 import { MultiAgentTool } from "../multiAgentTool";
 
