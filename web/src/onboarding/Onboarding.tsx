@@ -31,13 +31,13 @@ import { areTermsAccepted, TermsScreen } from "./TermsScreen";
 
 export function OnboardGate({ children }: React.PropsWithChildren) {
   const { user, hasAccess, authLoaded } = useAuthContext();
-  const { prefs } = usePrefsContext();
+  const { prefs, runtimeConfig } = usePrefsContext();
   const [continueKey, setContinueKey] = useState(0);
   const hasLocalDevAccessBypass = window.location.hostname === "localhost";
   // only check on first mount to avoid kicking users out if they delete prefs
   const initialConfigDone = useMemo(
-    () => areRequiredPrefsSet(prefs),
-    [continueKey],
+    () => areRequiredPrefsSet(prefs, runtimeConfig),
+    [continueKey, prefs, runtimeConfig],
   );
   const termsAccepted = useMemo(() => areTermsAccepted(prefs), [continueKey]);
 

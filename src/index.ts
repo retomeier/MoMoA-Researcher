@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import "dotenv/config";
 import express, { Application } from 'express';
 import http from 'http';
 import cors from 'cors';
@@ -37,6 +38,17 @@ initializeWebSocketServer(port, server);
 
 // Service sessions with state persisted in Firebase RTDB
 app.use(cors());
+app.get('/s/runtime-config', (_req, res) => {
+    return res.json({
+        hasGeminiApiKey: !!process.env.GEMINI_API_KEY,
+        hasGoogleApiKey: !!process.env.GOOGLE_API_KEY,
+        hasGithubToken: !!process.env.GITHUB_TOKEN,
+        hasJulesApiKey: !!process.env.JULES_API_KEY,
+        hasStitchApiKey: !!process.env.STITCH_API_KEY,
+        hasE2BApiKey: !!process.env.E2B_API_KEY,
+        hasGithubScratchPadRepo: !!process.env.GITHUB_SCRATCHPAD_REPO,
+    });
+});
 app.post('/s/run-session', express.json({ type: '*/*' }), async (req, res) => {
     const { sessionId } = req.body;
 

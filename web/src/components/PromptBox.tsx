@@ -84,7 +84,7 @@ export function PromptBox({
   supportsGitHub?: boolean;
 
 }) {
-  const { prefs } = usePrefsContext();
+  const { prefs, runtimeConfig } = usePrefsContext();
   const [prompt, setPrompt] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [notWorkingBuild, setNotWorkingBuild] = useState(false);
@@ -113,10 +113,10 @@ export function PromptBox({
   };
 
   const globalDisabledReason = useMemo(() => {
-    return areRequiredPrefsSet(prefs)
+    return areRequiredPrefsSet(prefs, runtimeConfig)
       ? ""
       : "Configure settings to get started";
-  }, [prefs]);
+  }, [prefs, runtimeConfig]);
 
   const [showGitRepoPopover, setShowGitRepoPopover] = useState(false);
 

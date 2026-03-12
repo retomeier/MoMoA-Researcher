@@ -22,7 +22,7 @@ import { areRequiredPrefsSet, RequiredPrefs } from "./RequiredPrefs";
 import { usePrefsContext } from "@/util/PrefsProvider";
 
 export function InitialPrefsScreen({ onContinue }: { onContinue: () => void }) {
-  const { prefs } = usePrefsContext();
+  const { prefs, runtimeConfig } = usePrefsContext();
   return (
     <Onboarding.Container>
       <Onboarding.Image>
@@ -37,7 +37,7 @@ export function InitialPrefsScreen({ onContinue }: { onContinue: () => void }) {
       <RequiredPrefs />
       <Button
         mt="5"
-        disabled={!areRequiredPrefsSet(prefs)}
+        disabled={!areRequiredPrefsSet(prefs, runtimeConfig)}
         className={styles.cta}
         onClick={onContinue}
       >
