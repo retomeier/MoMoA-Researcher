@@ -53,10 +53,10 @@ export const askExpertTool: MultiAgentTool = {
 
     updateLog(`${this.displayName} Invoked`);
 
-    context.sendMessage(JSON.stringify({
-      status: "PROGRESS_UPDATES",
-      current_status_message: `Getting additional guidance from an 'Expert' (Spoiler: It's a bigger LLM with a special prompt).`,
-    }));
+    context.sendMessage({
+      type: 'PROGRESS_UPDATE',
+      message: `Getting additional guidance from an 'Expert' (Spoiler: It's a bigger LLM with a special prompt).`,
+    });
        
     try {      
       let problemSummary = question;
@@ -190,18 +190,16 @@ export const askExpertTool: MultiAgentTool = {
         LastOrchestratorResponse: result
       });
           
-      let opinionSummary = ""
       try {
-        opinionSummary = (await context.multiAgentGeminiClient.sendOneShotMessage(
+        const opinionSummaryPromise = (context.multiAgentGeminiClient.sendOneShotMessage(
           completed_status_message_prompt,
           { model: DEFAULT_GEMINI_LITE_MODEL, signal: context.signal }
-        ))?.text || "";
+        )).then(msg => msg.text || "Empty");
+        context.sendMessage({
+          type: 'PROGRESS_UPDATE',
+          message: opinionSummaryPromise,
+      });
       } catch (_error) {}
-
-      context.sendMessage(JSON.stringify({
-        status: "PROGRESS_UPDATES",
-        completed_status_message: opinionSummary,
-      }));
   
       addFAQ(problemSummary, expertOpinion, context);
 

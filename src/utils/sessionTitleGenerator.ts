@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-import { DEFAULT_GEMINI_LITE_MODEL } from "../config/models";
-import { GeminiClient } from "../services/geminiClient";
+import { DEFAULT_GEMINI_LITE_MODEL } from "../config/models.js";
+import { GeminiClient } from "../services/geminiClient.js";
 
 export async function generateSessionTitle(
   userPrompt: string,

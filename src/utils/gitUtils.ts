@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-import * as fs from "fs";
+import * as fs from "fs"; 
 import * as path from "path";
 import { tmpdir } from "node:os";
-import simpleGit, { SimpleGit } from "simple-git";
+import { simpleGit, SimpleGit } from "simple-git";
 import { isBinaryFileSync } from "isbinaryfile";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 
 /**
  * Checks if a directory is within a git repository
@@ -154,4 +155,82 @@ export async function cloneRepoIntoMemory({
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
+}
+
+export async function decodeGitBinaries(
+  binaryPatches: string[],
+  filenamesToExtract: string[]
+): Promise<Map<string, string>> {
+  const tempDir = await mkdtemp(path.join(tmpdir(), 'jules-bin-'));
+  const decodedBinaries = new Map<string, string>();
+
+  try {
+    const git = simpleGit(tempDir);
+    await git.init(); // Create dummy repo
+    
+    // Write all accepted binary patches into one file
+    const combinedPatch = binaryPatches.join('\n');
+    const patchPath = path.join(tempDir, 'binary.patch');
+    await writeFile(patchPath, combinedPatch);
+
+    // Apply the binary patch
+    await git.raw(['apply', '--binary', 'binary.patch']);
+
+    // Read the successfully created files back into memory
+    for (const filename of filenamesToExtract) {
+      try {
+         const extractedPath = path.join(tempDir, filename);
+         const fileBuffer = await readFile(extractedPath);
+         decodedBinaries.set(filename, fileBuffer.toString('base64'));
+      } catch (e) {
+         console.error(`Failed to read extracted binary: ${filename}`, e);
+      }
+    }
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+  return decodedBinaries;
+}
+
+export async function applyGitPatchWithBinaries(
+  patchString: string, 
+  _existingFiles: Map<string, string> // To provide context for text changes in the same patch
+): Promise<Map<string, string>> {
+  const tempDir = await fs.promises.mkdtemp(path.join(tmpdir(), 'jules-patch-'));
+  const extractedBinaries = new Map<string, string>();
+
+  try {
+    const git = simpleGit(tempDir);
+    await git.init(); // Initialize a dummy repo so git apply works smoothly
+
+    // 1. Write the patch file to disk
+    const patchPath = path.join(tempDir, 'changes.patch');
+    await fs.promises.writeFile(patchPath, patchString);
+
+    // 2. Apply the patch 
+    // We use --unidiff-zero in case of context mismatches, and --whitespace=nowarn
+    await git.raw(['apply', '--binary', 'changes.patch']);
+
+    // 3. Scan the temp directory for the generated files
+    // (You could also parse the patchString to know exactly which filenames to look for)
+    const filesInTemp = await fs.promises.readdir(tempDir, { recursive: true });
+    
+    for (const file of filesInTemp) {
+      const fullPath = path.join(tempDir, file);
+      const stat = await fs.promises.stat(fullPath);
+      
+      if (stat.isFile() && file !== 'changes.patch' && !file.startsWith('.git')) {
+        // Read the generated binary file
+        const fileBuffer = await fs.promises.readFile(fullPath);
+        extractedBinaries.set(file, fileBuffer.toString('base64'));
+      }
+    }
+  } catch (error) {
+    console.error("Failed to apply Git binary patch:", error);
+  } finally {
+    // 4. Clean up the temp directory immediately
+    await fs.promises.rm(tempDir, { recursive: true, force: true });
+  }
+
+  return extractedBinaries;
 }

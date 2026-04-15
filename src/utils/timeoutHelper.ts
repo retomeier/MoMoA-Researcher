@@ -14,7 +14,28 @@
  * limitations under the License.
  */
 
-export const withDeadline = async <T>(promise: Promise<T>, deadlineMs: number, signal?: AbortSignal): Promise<T> => {
+export const withDeadline = async <T>(
+  promise: Promise<T>, 
+  deadlineMs: number | undefined, 
+  signal?: AbortSignal
+): Promise<T> => {
+  // No project deadline
+  if (deadlineMs === undefined) {
+    if (!signal) return promise;
+
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        if (signal.aborted) {
+          return reject(new Error("Operation aborted."));
+        }
+        signal.addEventListener('abort', () => {
+          reject(new Error("Operation aborted."));
+        });
+      })
+    ]);
+  }
+
   const remaining = deadlineMs - Date.now();
   
   if (remaining <= 0) throw new Error("Hard time limit reached before tool execution.");

@@ -15,7 +15,7 @@
  */
 
 import { applyPatch, createTwoFilesPatch, parsePatch } from 'diff';
-import { MultiAgentToolContext } from '../momoa_core/types';
+import { MultiAgentToolContext } from '../momoa_core/types.js';
 import { Buffer } from 'node:buffer';
 import * as zlib from 'node:zlib';
 

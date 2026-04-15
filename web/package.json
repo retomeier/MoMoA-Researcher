@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^1.24.0",
+    "@google/genai": "^1.46.0",
     "@radix-ui/themes": "^3.2.1",
     "@tensorflow-models/speech-commands": "^0.5.4",
     "@tensorflow/tfjs": "^4.22.0",
@@ -47,6 +47,7 @@
     "@types/react-dom": "^18.2.7",
     "@vitejs/plugin-basic-ssl": "^2.1.0",
     "@vitejs/plugin-react": "^5.1.0",
+    "baseline-browser-mapping": "^2.10.19",
     "sass": "^1.93.2",
     "typescript": "^5.0.2",
     "vite": "^7.1.12",

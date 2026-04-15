@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-import { DEFAULT_GEMINI_PRO_MODEL } from "../config/models";
-import { GeminiClient } from "../services/geminiClient";
-import { getAssetString, getExpertPrompt } from "../services/promptManager";
-import { removeBacktickFences } from "../utils/markdownUtils";
-import { OverseerFeedback, GuidanceType } from "./types";
+import { DEFAULT_GEMINI_PRO_MODEL } from "../config/models.js";
+import { GeminiClient } from "../services/geminiClient.js";
+import { getAssetString, getExpertPrompt } from "../services/promptManager.js";
+import { removeBacktickFences } from "../utils/markdownUtils.js";
+import { OverseerFeedback, GuidanceType } from "./types.js";
 
 const NO_DIFF_STRING = "---No diff information available---"
 

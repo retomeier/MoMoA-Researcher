@@ -18,6 +18,10 @@ import path from 'path';
 import { promises as fs } from 'fs';
 import matter from 'gray-matter';
 import { toKebabCase } from '../utils/markdownUtils.js';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Define the base path for prompts
 const PROMPTS_BASE_PATH = path.join(__dirname, '..', 'assets', 'prompts');

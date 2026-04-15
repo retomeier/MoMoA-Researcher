@@ -102,12 +102,11 @@ export const OptimizerTool: MultiAgentTool = {
    * with various environment variable combinations
    */
   async execute(params: Record<string, unknown>, context: MultiAgentToolContext): Promise<MultiAgentToolResult> {
-
-    const updateProgress = (message: string) => {
-        context.sendMessage(JSON.stringify({
-        status: 'PROGRESS_UPDATES',
-        completed_status_message: message,
-        }));
+    const updateProgress = (message: string | Promise<string>) => {
+        context.sendMessage({
+          type: 'PROGRESS_UPDATE',
+          message: message,
+        });
     };
 
     // 1. Parsing & Inputs
@@ -264,11 +263,18 @@ export const OptimizerTool: MultiAgentTool = {
         let executableScript = path.basename(evalScript);
         const hasCargo = filesToStage.some(f => f.path.endsWith('Cargo.toml'));
         
+        const compilerLimitKB = Math.floor((os.freemem() / 1024) * MAX_MEM_PERCENTAGE);
+        const isMac = os.platform() === 'darwin';
+        const compilerUlimitCmd = isMac ? '' : `ulimit -v ${compilerLimitKB} && `;
+
         if (isRust) {
             updateProgress("Compiling Rust Driver...");
             if (hasCargo) {
                  // Build release mode
-                 const res = await runScript('cargo', ['build', '--release', '--quiet'], tempDir, process.env, TIMEOUT);
+                 const res = await runScript(
+                    'cargo', 
+                    ['build', '--release', '--quiet'], 
+                    tempDir, process.env, TIMEOUT);
                  if (res.exitCode !== 0) return { result: `Cargo Build Failed:\n${res.stderr}` };
                  // Locate binary (heuristics: name of folder or name in toml, but 'cargo run' handles this)
                  // Optimally we just use 'cargo run' every time, but that's slow.
@@ -279,13 +285,10 @@ export const OptimizerTool: MultiAgentTool = {
                  // but for single files we MUST compile.
             } else {
                 // Single File Compilation
-                const compilerLimitKB = Math.floor((os.freemem() / 1024) * MAX_MEM_PERCENTAGE);
-                
-                // Single File Compilation
                 executableScript = 'optimizer_driver';
                 const res = await runScript(
                     'sh', 
-                    ['-c', `ulimit -v ${compilerLimitKB} && rustc ${evalScript} -o ${executableScript}`], 
+                    ['-c', `${compilerUlimitCmd}rustc ${evalScript} -o ${executableScript}`],
                     tempDir, 
                     process.env, 
                     TIMEOUT
@@ -391,6 +394,8 @@ except Exception as e:
                         await fs.symlink(sourcePath, destPath);
                     }
                     
+                    const execUlimitCmd = os.platform() === 'darwin' ? '' : `ulimit -v ${memLimitKB} && `;
+
                     // Specific logic for binaries
                     let cmd = '', args: string[] = [];
                     if (isRust) {
@@ -398,14 +403,14 @@ except Exception as e:
                              // Symlink target dir to avoid recompiling
                              try { await fs.symlink(path.join(tempDir, 'target'), path.join(trialDir, 'target')); } catch(e){}
                              cmd = 'sh'; 
-                             args = ['-c', `ulimit -v ${memLimitKB} && cargo run --release --quiet`];
+                             args = ['-c', `${execUlimitCmd}cargo run --release --quiet`];
                         } else {
                              // Symlink binary
                              const binSource = path.join(tempDir, executableScript);
                              const binDest = path.join(trialDir, executableScript);
                              await fs.symlink(binSource, binDest);
                              cmd = 'sh'; 
-                             args = ['-c', `ulimit -v ${memLimitKB} && ${binDest}`];
+                             args = ['-c', `${execUlimitCmd}${binDest}`];
                         }
                     } else {
                         // Python Wrapper Symlink
@@ -416,7 +421,7 @@ except Exception as e:
                         );
                         }
                         cmd = 'sh'; 
-                        args = ['-c', `ulimit -v ${memLimitKB} && python3 ${executableScript}`];
+                        args = ['-c', `${execUlimitCmd}python3 ${executableScript}`];
                     }
 
                     const currentEnv = {

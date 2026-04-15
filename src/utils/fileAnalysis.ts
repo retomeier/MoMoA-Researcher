@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-import { DEFAULT_GEMINI_LITE_MODEL } from "../config/models";
-import { FileSummary, InfrastructureContext } from "../momoa_core/types";
-import { GeminiClient } from "../services/geminiClient";
-import { getAssetString, replaceRuntimePlaceholders } from "../services/promptManager";
-import { getLockFileFileDescription, isLockFile } from "./diffGenerator";
-import { removeBacktickFences, repairTruncatedJsonArray, toKebabCase } from "./markdownUtils";
+import { DEFAULT_GEMINI_LITE_MODEL } from "../config/models.js";
+import { FileSummary, InfrastructureContext } from "../momoa_core/types.js";
+import { GeminiClient } from "../services/geminiClient.js";
+import { getAssetString, replaceRuntimePlaceholders } from "../services/promptManager.js";
+import { getLockFileFileDescription, isLockFile } from "./diffGenerator.js";
+import { removeBacktickFences, repairTruncatedJsonArray, toKebabCase } from "./markdownUtils.js";
 import { TaskRelevantFile, analyzeRelevantFilesForTask } from "./taskFileAnalyzer.js";
 
 /*

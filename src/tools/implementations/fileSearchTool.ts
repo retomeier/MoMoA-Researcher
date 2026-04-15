@@ -36,10 +36,10 @@ export const fileSearchTool: MultiAgentTool = {
 
     const query = params.query;
 
-    context.sendMessage(JSON.stringify({
-      status: "PROGRESS_UPDATES",
-      completed_status_message: `Searching for \`${query}\``,
-    }));
+    context.sendMessage({
+      type: 'PROGRESS_UPDATE',
+      message: `Searching for \`${query}\``,
+    });
 
     // 1. Search text file content.
     const contentMatches = findInFiles(query, context.fileMap) || [];
@@ -66,10 +66,10 @@ export const fileSearchTool: MultiAgentTool = {
 
     const result = finalResultArray.length > 0 ? finalResultArray.join('\n') : `No matches found for your query.`;
 
-    context.sendMessage(JSON.stringify({
-      status: "PROGRESS_UPDATES",
-      completed_status_message: `\`\`\`\n${result.trim()}\n\`\`\``,
-    }));
+    context.sendMessage({
+      type: 'PROGRESS_UPDATE',
+      message: `\`\`\`\n${result.trim()}\n\`\`\``,
+    });
 
     return {
       result: result,

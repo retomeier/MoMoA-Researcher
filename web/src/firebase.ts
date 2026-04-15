@@ -19,7 +19,7 @@ import { getAuth } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
-import { FIREBASE_CONFIG } from "./firebase-config";
+import { FIREBASE_CONFIG } from "./firebase-config.ts";
 
 export const app = initializeApp(FIREBASE_CONFIG);
 export const db = getDatabase(app);

@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-import { DEFAULT_GEMINI_LITE_MODEL } from "../config/models";
-import { GeminiClient } from "../services/geminiClient";
-import { getAssetString, replaceRuntimePlaceholders } from "../services/promptManager";
-import { removeBacktickFences } from "./markdownUtils";
+import { DEFAULT_GEMINI_LITE_MODEL } from "../config/models.js";
+import { GeminiClient } from "../services/geminiClient.js";
+import { getAssetString, replaceRuntimePlaceholders } from "../services/promptManager.js";
+import { removeBacktickFences } from "./markdownUtils.js";
 
 /**
  * Attempts to find a filename in a map, using an LLM as a fallback to correct typos.

@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-import { MultiAgentToolContext } from "../momoa_core/types";
-import { getAssetString } from "../services/promptManager";
-import { getFileAnalysis } from "./fileAnalysis";
-import { fileNameLookup } from "./fileNameLookup";
+import { MultiAgentToolContext } from "../momoa_core/types.js";
+import { getAssetString } from "../services/promptManager.js";
+import { getFileAnalysis } from "./fileAnalysis.js";
+import { fileNameLookup } from "./fileNameLookup.js";
 
 /**
  * Removes triple backtick fences from a string if they exist at the start and end.

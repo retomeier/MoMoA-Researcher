@@ -61,19 +61,19 @@ export const urlFetchTool: MultiAgentTool = {
 
     // Check cache (Only for things previously determined to be pure text content/webpages)
     if (cache.has(url)) {
-      context.sendMessage(JSON.stringify({
-          status: "PROGRESS_UPDATES",
-          completed_status_message: `Using cached content from \`${url}\``,
-        })
+      context.sendMessage({
+          type: 'PROGRESS_UPDATE',  
+          message: `Using cached content from \`${url}\``,
+        }
       );
       return cache.get(url)!;
     }
 
     // Cache Miss: Proceed with fetch
-    context.sendMessage(JSON.stringify({
-        status: "PROGRESS_UPDATES",
-        completed_status_message: `Fetching content from \`${url}\``,
-      })
+    context.sendMessage({
+        type: 'PROGRESS_UPDATE',
+        message: `Fetching content from \`${url}\``,
+      }
     );
 
     try {
@@ -149,10 +149,10 @@ export const urlFetchTool: MultiAgentTool = {
                 relatedFiles: ''
             });
 
-            context.sendMessage(JSON.stringify({
-                status: "PROGRESS_UPDATES",
-                completed_status_message: `Successfully downloaded \`${filename}\` (${buffer.length} bytes).`,
-              })
+            context.sendMessage({
+                type: 'PROGRESS_UPDATE',
+                message: `Successfully downloaded \`${filename}\` (${buffer.length} bytes).`,
+              }
             );
 
             return {
@@ -188,10 +188,10 @@ export const urlFetchTool: MultiAgentTool = {
                           `Saved to project files (Binary).\n[Binary content hidden]`;
         }
 
-        context.sendMessage(JSON.stringify({
-            status: "PROGRESS_UPDATES",
-            completed_status_message: `Successfully downloaded '${filename}' (${buffer.length} bytes).`,
-          })
+        context.sendMessage({
+            type: 'PROGRESS_UPDATE',
+            message: `Successfully downloaded '${filename}' (${buffer.length} bytes).`,
+          }
         );
 
         return {
@@ -210,10 +210,10 @@ export const urlFetchTool: MultiAgentTool = {
 
       const content = buffer.toString('utf-8');
 
-      context.sendMessage(JSON.stringify({
-          status: "PROGRESS_UPDATES",
-          completed_status_message: `\`\`\`\`\n${content}\n\`\`\`\``,
-        })
+      context.sendMessage({
+          type: 'PROGRESS_UPDATE',
+          message: `\`\`\`\`\n${content}\n\`\`\`\``,
+        }
       );
 
       const toolResult: MultiAgentToolResult = {
@@ -229,10 +229,10 @@ export const urlFetchTool: MultiAgentTool = {
       // This block handles network errors (e.g., DNS failure, connection refused) - DO NOT CACHE
       const errorMessage = error instanceof Error ? error.message : String(error);
 
-      context.sendMessage(JSON.stringify({
-        status: "PROGRESS_UPDATES",
-        completed_status_message: errorMessage,
-      }));
+      context.sendMessage({
+        type: 'PROGRESS_UPDATE',
+        message: errorMessage,
+      });
       
       return {
         result: `Error: Network failure while fetching URL '${url}'. Details: ${errorMessage}`

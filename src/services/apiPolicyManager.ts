@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { LlmBlockedError } from "../shared/errors";
+import { LlmBlockedError } from "../shared/errors.js";
 
 export class ApiPolicyManager {
     // State is centralized here, shared across the application

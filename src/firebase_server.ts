@@ -15,16 +15,16 @@
  */
 
 import { randomUUID } from "crypto";
-import { credential, type ServiceAccount } from "firebase-admin";
+import pkg from 'firebase-admin';
+const { credential } = pkg;
+import { ServiceAccount } from "firebase-admin";
 import { AppOptions, initializeApp } from "firebase-admin/app";
 import { getDatabase, OnDisconnect } from "firebase-admin/database";
 import fs from "fs";
 import { isBinaryFileSync } from "isbinaryfile";
-import path from "path";
 import { Config, DEFAULT_GEMINI_EMBEDDING_MODEL } from "./config/config.js";
 import { ProjectAnalysisResult } from "./momoa_core/types.js";
 import { Orchestrator } from "./momoa_core/orchestrator.js";
-import { AuthType } from "./services/contentGenerator";
 import {
   FileChunkData,
   HistoryItem,
@@ -35,11 +35,18 @@ import {
   SESSION_ROOT_PATH,
   PROJECT_ROOT_PATH,
   ProjectMetadata,
-} from "./shared/model";
+} from "./shared/model.js";
 import { deferred } from "./utils/promises.js";
 import { generateSessionTitle } from "./utils/sessionTitleGenerator.js";
 import { cloneRepoIntoMemory } from "./utils/gitUtils.js";
 import { resolveProjectSpecification } from "./utils/projectSpecResolver.js";
+import { AuthType } from "./services/contentGenerator.js";
+import { fileURLToPath } from 'url';
+import path from 'path';
+import { ProgressQueue } from "./utils/progressQueue.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // firebase config
 let appOptions: AppOptions = {
@@ -217,39 +224,35 @@ function sendMessage(sessionId: string, message: string): void {
       .child("metadata")
       .update({ modifiedAt: Date.now(), status: "blocked" });
   } else if (parsed.status === "PROGRESS_UPDATES") {
+    sessionRef.child("metadata").update({
+      latestUpdate: parsed.completed_status_message || null,
+      modifiedAt: Date.now(),
+      status: "running"
+    }).catch(err => console.error("Failed to update progress log", err));
+} else if (parsed.status === "ERROR") {
     sessionRef.child("metadata").transaction((currentData) => {
       if (currentData) {
-        currentData.latestUpdate = parsed.completed_status_message || null;
-        currentData.modifiedAt = Date.now();
-        // Only mark as running if it hasn't already completed/failed
-        if (currentData.status !== "complete") {
-          currentData.status = "running";
+        if (currentData.status === "complete" || currentData.status === "failed") {
+          return; // Abort transaction: no state change needed
         }
+        currentData.modifiedAt = Date.now();
+        currentData.status = "failed";
       }
       return currentData;
-    });
-  } else if (parsed.status === "ERROR") {
-    // Explicitly handle ERRORs so they don't fall into the "running" catch-all
-    sessionRef.child("metadata").transaction((currentData) => {
-      if (currentData) {
-        currentData.modifiedAt = Date.now();
-        // If it was already marked complete, don't let a late timeout overwrite it
-        if (currentData.status !== "complete") {
-          currentData.status = "failed";
-        }
-      }
-      return currentData;
-    });
+    }).catch(err => console.error("Firebase transaction failed for ERROR:", err));
+
   } else if (parsed.status !== "WORK_LOG") {
     sessionRef.child("metadata").transaction((currentData) => {
       if (currentData) {
-        currentData.modifiedAt = Date.now();
-        if (currentData.status !== "complete") {
-          currentData.status = "running";
+        // Only run the transaction if the status genuinely needs to change
+        if (currentData.status === "complete" || currentData.status === "running") {
+          return; // Abort transaction: don't fight over modifiedAt timestamps
         }
+        currentData.modifiedAt = Date.now();
+        currentData.status = "running";
       }
       return currentData;
-    });
+    }).catch(err => console.warn("Firebase transaction aborted for status update:", err.message));
   }
 }
 
@@ -528,8 +531,6 @@ async function handleInitialRequest(
       image,
       imageMimeType,
       weaveId,
-      maxDurationMs, 
-      gracePeriodMs  
     } = requestData as InitialRequestData & { projectId?: string; mode?: string; projectSpecification?: string };
 
     const projectSpecification = await resolveProjectSpecification(requestProjectSpecification, weaveId);
@@ -577,8 +578,26 @@ async function handleInitialRequest(
 
     const geminiClient = await requestConfig.getGeminiClient();
 
-    const sendMessageCallback = (message: string) =>
-      sendMessage(clientUUID, message);
+    // 1. Create a simulated WebSocket to trick the ProgressQueue into writing to Firebase
+    const firebaseWsAdapter = {
+      readyState: 1, // Simulates WebSocket.OPEN
+      send: (msg: string) => sendMessage(clientUUID, msg)
+    } as any;
+
+    // 2. Instantiate the queue for this specific session
+    const progressQueue = new ProgressQueue(firebaseWsAdapter, clientUUID);
+
+    // 3. Create the interceptor callback
+    const sendMessageCallback = (message: any) => {
+      // Route tagged updates (Strings and Promises) to the queue
+      if (typeof message === 'object' && message !== null && message.type === 'PROGRESS_UPDATE') {
+        progressQueue.add(message.message);
+      } 
+      // Fallback for everything else (WORK_LOG, COMPLETE_RESULT, etc.)
+      else if (typeof message === 'string') {
+        sendMessage(clientUUID, message);
+      }
+    };
 
     // Decode file content and use the library to differentiate binary/text
     const fileMap = new Map<string, string>();
@@ -693,6 +712,15 @@ if (githubUrl) {
       });
     }
 
+    // 2.5b Update session title
+    let sessionTitle = "Untitled Session"
+    await generateSessionTitle(requestData.prompt, geminiClient).then((title) => {
+      let sessionRef = db.ref(SESSION_ROOT_PATH).child(clientUUID);
+      sessionRef.child("metadata").update({ title });
+      sessionTitle = title;
+    });
+
+
     // 2. Create and store the Runner instance (Orchestrator or Analyzer)
     const runner = new Orchestrator(
           prompt,
@@ -707,13 +735,14 @@ if (githubUrl) {
           saveFiles ?? true,
           secrets,
           requestConfig,
+          sessionTitle,
           projectSpecification,
           environmentInstructions,
           notWorkingBuild,
           session.abort.signal,
           mode as ServerMode | undefined,
           SERVER_MAX_DURATION_MS,
-          SERVER_GRACE_PERIOD_MS
+          SERVER_GRACE_PERIOD_MS,
         );
 
     session.runner = runner;
@@ -728,12 +757,6 @@ if (githubUrl) {
         message: `# ${runnerName} invoked successfully:\n${prompt}\n\n`,
       })
     );
-
-    // 2.5b Update session title
-    generateSessionTitle(requestData.prompt, geminiClient).then((title) => {
-      let sessionRef = db.ref(SESSION_ROOT_PATH).child(clientUUID);
-      sessionRef.child("metadata").update({ title });
-    });
 
     // 3. Run the runner asynchronously
     runner
@@ -874,6 +897,7 @@ async function deleteProjectAndDependencies(
 
 // Export the public functions
 export {
+  db,
   abortSession,
   deleteProjectAndDependencies,
   handleFileChunk,

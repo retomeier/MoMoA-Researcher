@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { MultiAgentToolContext, MultiAgentToolResult, ToolParsingResult } from "../momoa_core/types";
+import { MultiAgentToolContext, MultiAgentToolResult, ToolParsingResult } from "../momoa_core/types.js";
 
 export interface MultiAgentTool {
   /**

@@ -71,10 +71,10 @@ export const fileReaderTool: MultiAgentTool = {
 
     addDynamicallyRelevantFile(filename);
 
-    context.sendMessage(JSON.stringify({
-        status: "PROGRESS_UPDATES",
-        completed_status_message: `Reading \`${filename}\``,
-      })
+    context.sendMessage({
+        type: 'PROGRESS_UPDATE',
+        message: `Reading \`${filename}\``,
+      }
     );
 
     const prefix = await getAssetString('file-content-prefix');

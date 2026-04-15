@@ -102,10 +102,10 @@ export const factFinderTool: MultiAgentTool = {
  
     // --- 2. Internet Search Part ---
     try {
-      context.sendMessage(JSON.stringify({
-        status: "PROGRESS_UPDATES",
-        completed_status_message: `Performing multi-turn Internet Search.`,
-      }));
+      context.sendMessage({
+        type: 'PROGRESS_UPDATE',
+        message: `Performing multi-turn Internet Search.`,
+      });
 
       const internetLookupToolString = 
 `You are an Internet search expert that can use a tool to look up information on the Internet. This is generally limited to URLs that represent APIs that don't require any authentication, and many websites won't be accessible to you. If you try to access a website and get a response that the Fetch Failed you should assume it's because you don't have permission to see it and just accept that you can't see it. Requests for internet lookups require both a URL to look at, and a question you want to get answered from that page.
@@ -202,11 +202,11 @@ ${question}`;
  
  
     // --- 3. Final Synthesis ---
-    context.sendMessage(JSON.stringify({
-      status: "PROGRESS_UPDATES",
-      completed_status_message: `Synthesizing final answer using all gathered facts.`,
-    }));
- 
+    context.sendMessage({
+      type: 'PROGRESS_UPDATE',
+      message: `Synthesizing final answer using all gathered facts.`,
+    });
+
     const replacementValues = {
       ExplicitlyProvided: providedInformation,
       SearchResults: internetSearchResult,
@@ -254,18 +254,16 @@ ${question}`;
       LastOrchestratorResponse: result
     });
         
-    let opinionSummary = ""
     try {
-      opinionSummary = (await context.multiAgentGeminiClient.sendOneShotMessage(
+      const opinionSummaryPromise = context.multiAgentGeminiClient.sendOneShotMessage(
         completed_status_message_prompt,
         { model: DEFAULT_GEMINI_LITE_MODEL, signal: context.signal }
-      ))?.text || "";
+      ).then(msg => msg.text || "");
+      context.sendMessage({
+        type: 'PROGRESS_UPDATE',
+        message: opinionSummaryPromise,
+      });
     } catch (_error) {}
-
-    context.sendMessage(JSON.stringify({
-      status: "PROGRESS_UPDATES",
-      completed_status_message: opinionSummary,
-    }));
  
     // --- 4. FAQ Update ---
     await addFAQ(question, result, context);

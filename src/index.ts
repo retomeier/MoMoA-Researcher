@@ -20,8 +20,8 @@ import cors from 'cors';
 import path from 'path';
 import process from 'process';
 import { getAuth } from 'firebase-admin/auth';
-import { initializeWebSocketServer } from './websocket_server';
-import { abortSession, runSession, deleteProjectAndDependencies } from './firebase_server';
+import { initializeWebSocketServer } from './websocket_server.js';
+import { abortSession, runSession, deleteProjectAndDependencies } from './firebase_server.js';
 
 // --- Server Setup ---
 

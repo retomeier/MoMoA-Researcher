@@ -14,21 +14,21 @@
  * limitations under the License.
  */
 
-import { DEFAULT_GEMINI_FLASH_MODEL, DEFAULT_GEMINI_LITE_MODEL } from "../config/models";
-import { GeminiClient } from "../services/geminiClient";
-import { getAssetString, getExpertPrompt, getWorkPhasePrompt, hasExpertPrompt, replaceRuntimePlaceholders, resolvePlaceholdersFromFiles } from "../services/promptManager";
-import { AddEntryOptions, TranscriptManager } from "../services/transcriptManager";
-import { PROJECT_DIFF_ID } from "../tools/implementations/revertFileTool";
-import { parseToolRequest } from "../tools/multiAgentToolParser";
-import { executeTool, getTool } from "../tools/multiAgentToolRegistry";
-import { generateDiffString } from "../utils/diffGenerator";
-import { getTaskRelevantFileDescriptions } from "../utils/fileAnalysis";
-import { formatExpertList, removeBacktickFences, replaceContentBetweenMarkers, toKebabCase } from "../utils/markdownUtils";
-import { Overseer } from "./overseer";
-import { Expert, MultiAgentToolContext, GuidanceType } from "./types";
-import { getFAQs } from "../utils/faqs";
-import { getFormattedCacheContents } from "../tools/implementations/urlFetchTool";
-import { withDeadline } from "../utils/timeoutHelper";
+import { DEFAULT_GEMINI_FLASH_MODEL, DEFAULT_GEMINI_LITE_MODEL } from "../config/models.js";
+import { GeminiClient } from "../services/geminiClient.js";
+import { getAssetString, getExpertPrompt, getWorkPhasePrompt, hasExpertPrompt, replaceRuntimePlaceholders, resolvePlaceholdersFromFiles } from "../services/promptManager.js";
+import { AddEntryOptions, TranscriptManager } from "../services/transcriptManager.js";
+import { PROJECT_DIFF_ID } from "../tools/implementations/revertFileTool.js";
+import { parseToolRequest } from "../tools/multiAgentToolParser.js";
+import { executeTool, getTool } from "../tools/multiAgentToolRegistry.js";
+import { generateDiffString } from "../utils/diffGenerator.js";
+import { getTaskRelevantFileDescriptions } from "../utils/fileAnalysis.js";
+import { formatExpertList, removeBacktickFences, replaceContentBetweenMarkers, toKebabCase } from "../utils/markdownUtils.js";
+import { Overseer } from "./overseer.js";
+import { Expert, MultiAgentToolContext, GuidanceType } from "./types.js";
+import { getFAQs } from "../utils/faqs.js";
+import { getFormattedCacheContents } from "../tools/implementations/urlFetchTool.js";
+import { withDeadline } from "../utils/timeoutHelper.js";
 
 const NO_RESULT_STRING = 'Sorry, this Work Phase was unable to perform the allocated task.';
 
@@ -50,7 +50,7 @@ const emptySummary =
  */
 export class WorkPhase {
   private multiAgentGeminiClient: GeminiClient;
-  private sendMessage: (message: string) => void;
+  private sendMessage: (message: any) => void;
   private task: string;
   private initialPrompt: string;
   private lastOrchestratorMessage: string;
@@ -108,11 +108,11 @@ export class WorkPhase {
       this.overseer?.addLog(message);
   }
 
-    private async updateProgressLog(message: string) {
-    this.sendMessage(JSON.stringify({
-      status: 'PROGRESS_UPDATES',
-      completed_status_message: message,
-    }));
+    private async updateProgressLog(message: string | Promise<string>) {
+    this.sendMessage({
+      type: 'PROGRESS_UPDATE',
+      message: message,
+    });
   }
 
   private async summarizeExpertUpdate(expertResponse: string): Promise<string> {
@@ -357,10 +357,10 @@ ${this.task}
       if (this.signal?.aborted) {
         this.updateLog('Work Phase received abort signal. Cancelling...');
 
-        this.sendMessage(JSON.stringify({
-          status: 'PROGRESS_UPDATES',
-          completed_status_message: '#### Cancelling Project\n\nThe Work Phase has received a cancellation request. Shutting down.'
-        }));
+        this.sendMessage({
+          type: 'PROGRESS_UPDATE',
+          message: '#### Cancelling Project\n\nThe Work Phase has received a cancellation request. Shutting down.'
+        });
 
         // Perform any immediate cleanup here if necessary before breaking
         workPhaseResult = 'Work Phase cancelled by user.';
@@ -375,7 +375,7 @@ ${this.task}
 
         if (timeRemaining <= 0) {
           await this.updateLog('Hard time limit reached within Work Phase. Forcing exit.');
-          await this.updateProgressLog("#### Time Limit Reached. Forcing End of Work Phase.");
+          this.updateProgressLog("#### Time Limit Reached. Forcing End of Work Phase.");
           done = true;
           return await this.endWorkphase();
         } 
@@ -385,7 +385,7 @@ ${this.task}
           
           this.addToEachExpertTranscript('user', timeWarning);
           await this.updateLog(`Soft time limit reached. Alerting Work Phase experts to wrap up.`);
-          await this.updateProgressLog(`\n#### System Alert\nTime running out. Forcing Work Phase completion.`);
+          this.updateProgressLog(`\n#### System Alert\nTime running out. Forcing Work Phase completion.`);
         }
       }
 
@@ -460,16 +460,16 @@ ${this.task}
       if (turn > this.maxAllowedTurns + 1) {
         this.addToEachExpertTranscript('user', `You have run out of turns and MUST return a result. You must now provide your best response to try and solve the task you were assigned.`)
         await this.updateLog(`Work Phase turn limit reached.`);
-        await this.updateProgressLog("#### Soft Turn Limit Reached.");
+        this.updateProgressLog("#### Soft Turn Limit Reached.");
       } 
       if (turn > this.maxAllowedTurns + 2) {
         done = true;
         await this.updateLog(`Hard Work Phase turn limit reached. Forced end of Work Phase.`);
-        await this.updateProgressLog("#### Hard Turn Limit Reached. Forcing End of Work Phase.");
+        this.updateProgressLog("#### Hard Turn Limit Reached. Forcing End of Work Phase.");
         return await this.endWorkphase();
       }
 
-      await this.updateProgressLog(`\n#### ${currentExpertName} (Turn #${turn+1})`);
+      this.updateProgressLog(`\n#### ${currentExpertName} (Turn #${turn+1})`);
 
       const currentExpertResponse = await this.multiAgentGeminiClient.sendTranscriptMessage(
         currentExpert?.transcript,
@@ -482,8 +482,7 @@ ${this.task}
       let currentExpertResponseText = currentExpertResponse.text || '';
       currentExpertResponseText = await currentExpert?.transcript.cleanLLMResponse(currentExpertResponseText) || currentExpertResponseText;
 
-      const expertSummary = await this.summarizeExpertUpdate(currentExpertResponseText);
-      this.updateProgressLog(`${expertSummary}`);
+      this.updateProgressLog(this.summarizeExpertUpdate(currentExpertResponseText));
 
       const responseUpdate = `${currentExpertName} said:\n${currentExpertResponseText}`;
       await this.updateLog(`${responseUpdate}`);
@@ -499,14 +498,14 @@ ${this.task}
       const toolRequest = await parseToolRequest(currentExpertResponseText, await getAssetString('tool-prefix'), this.toolContext);
       if (typeof(toolRequest) === 'string') {
         await this.updateLog(`Tool identifier found: Parsing error: ${toolRequest}`);
-        await this.updateProgressLog("#### Tool Request Parsing Error")
+        this.updateProgressLog("#### Tool Request Parsing Error")
         this.addToEachExpertTranscript('user', toolRequest);
         continue;
       } else if (toolRequest) {
         if (toolRequest?.toolName) {
           const tool = getTool(toolRequest.toolName);
           await this.updateLog(`Invoking '${tool?.displayName}' Tool`);
-          await this.updateProgressLog(`\n#### '${tool?.displayName}' Invoked`)
+          this.updateProgressLog(`\n#### '${tool?.displayName}' Invoked`)
         }
         try {
 
@@ -525,7 +524,7 @@ ${this.task}
           const errorMessage = `Tool execution failed: ${error.message}`;
           this.addToEachExpertTranscript('user', errorMessage);
           await this.updateLog(errorMessage);
-          await this.updateProgressLog(`${errorMessage}`);
+          this.updateProgressLog(`${errorMessage}`);
         }
         this.toolContext.overseer?.updateCurrentDiff(generateDiffString(this.toolContext, true));
         continue;
@@ -537,7 +536,7 @@ ${this.task}
         done = true;
         const parts = currentExpertResponseText.split(/^\u0040RETURN/im);
         const resultString = parts.length > 1 ? parts.pop()?.trim() ?? undefined : undefined;
-        await this.updateProgressLog(`\n#### ${workphaseName} Work Phase Summary`)
+        this.updateProgressLog(`\n#### ${workphaseName} Work Phase Summary`)
         return await this.endWorkphase(resultString);
       }
     }

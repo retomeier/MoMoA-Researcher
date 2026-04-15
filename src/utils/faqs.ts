@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-import { DEFAULT_GEMINI_FLASH_MODEL } from "../config/models";
-import { FAQ, MultiAgentToolContext } from "../momoa_core/types";
-import { getAssetString, getToolPreamblePrompt, replaceRuntimePlaceholders } from "../services/promptManager";
-import { TranscriptManager } from "../services/transcriptManager";
-import { getFileDescriptions } from "./fileAnalysis";
+import { DEFAULT_GEMINI_FLASH_MODEL } from "../config/models.js";
+import { FAQ, MultiAgentToolContext } from "../momoa_core/types.js";
+import { getAssetString, getToolPreamblePrompt, replaceRuntimePlaceholders } from "../services/promptManager.js";
+import { TranscriptManager } from "../services/transcriptManager.js";
+import { getFileDescriptions } from "./fileAnalysis.js";
 
 const faqs = new Map<string, FAQ>();
 

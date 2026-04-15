@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-import { DEFAULT_GEMINI_FLASH_MODEL } from "../config/models";
-import { GeminiClient } from "../services/geminiClient";
-import { getAssetString, replaceRuntimePlaceholders } from "../services/promptManager";
-import { TranscriptManager } from "../services/transcriptManager";
-import { removeBacktickFences, repairTruncatedJsonArray, replaceContentBetweenMarkers } from "./markdownUtils"; 
-import { InfrastructureContext, MultiAgentToolContext } from "../momoa_core/types"; 
-import { parseToolRequest } from "../tools/multiAgentToolParser";
-import { executeTool, getTool } from "../tools/multiAgentToolRegistry";
+import { DEFAULT_GEMINI_FLASH_MODEL } from "../config/models.js";
+import { GeminiClient } from "../services/geminiClient.js";
+import { getAssetString, replaceRuntimePlaceholders } from "../services/promptManager.js";
+import { TranscriptManager } from "../services/transcriptManager.js";
+import { removeBacktickFences, repairTruncatedJsonArray, replaceContentBetweenMarkers } from "./markdownUtils.js"; 
+import { InfrastructureContext, MultiAgentToolContext } from "../momoa_core/types.js"; 
+import { parseToolRequest } from "../tools/multiAgentToolParser.js";
+import { executeTool, getTool } from "../tools/multiAgentToolRegistry.js";
 
 /**
  * Defines the output structure for a file's relevance to a specific task.
@@ -114,7 +114,7 @@ export async function analyzeRelevantFilesForTask(
   binaryFileMap: Map<string, string>,
   infrastructureContext: InfrastructureContext,
   multiAgentGeminiClient: GeminiClient,
-  sendMessage: (message: string) => void,
+  sendMessage: (message: any) => void,
   image?: string,
   imageMimeType?: string
 ): Promise<TaskRelevantFile[]> {
@@ -126,10 +126,10 @@ export async function analyzeRelevantFilesForTask(
     }));
 
     if (updateProgress) {
-      sendMessage(JSON.stringify({
-        status: 'PROGRESS_UPDATES',
-        completed_status_message: message,
-      }));
+      sendMessage({
+        type: 'PROGRESS_UPDATE',
+        message: message,
+      });
     }
   };
 
@@ -165,6 +165,7 @@ export async function analyzeRelevantFilesForTask(
     multiAgentGeminiClient: multiAgentGeminiClient,
     saveFileResolver: null,
     infrastructureContext: infrastructureContext,
+    sessionTitle: 'File Analysis Session',
     initialPrompt: taskDescription,
     julesBranchName: null,
     saveFiles: false,

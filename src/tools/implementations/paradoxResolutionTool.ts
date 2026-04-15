@@ -48,8 +48,8 @@ async execute(params: Record<string, string>, context: MultiAgentToolContext): P
 
   context.sendMessage(JSON.stringify(
     {
-      status: "PROGRESS_UPDATES",
-      current_status_message: `I've encountered a Paradox, so I'm asking an 'Expert' persona to help me resolve it.`,
+      type: 'PROGRESS_UPDATE',
+      message: `I've encountered a Paradox, so I'm asking an 'Expert' persona to help me resolve it.`,
     }
   ));
       
@@ -123,37 +123,36 @@ async execute(params: Record<string, string>, context: MultiAgentToolContext): P
     if (!paradoxResolution) {
       const nullResult = '[The expert provided a non-text response]';
       updateLog(nullResult);
-      context.sendMessage(JSON.stringify({
-        status: 'PROGRESS_UPDATES',
-        completed_status_message: "The Expert wasn't able to help.",
-      }));
+      context.sendMessage({
+        type: 'PROGRESS_UPDATE',  
+        message: "The Expert wasn't able to help.",
+      });
       return { result: nullResult };
     }
 
     const result = `You asked for clarification and this is the result:\n${paradoxResolution}`;
 
-    let resolutionSummary = ""
     try {
-      resolutionSummary = (await context.multiAgentGeminiClient.sendOneShotMessage(
+      const resolutionSummaryPromise = context.multiAgentGeminiClient.sendOneShotMessage(
         result,
         { model: DEFAULT_GEMINI_LITE_MODEL, signal: context.signal }
-      ))?.text || "";
-    } catch (_error) {}
+      ).then(msg => msg.text || "");
 
-    context.sendMessage(JSON.stringify({
-      status: "PROGRESS_UPDATES",
-      completed_status_message: resolutionSummary,
-    }));
+      context.sendMessage({
+        type: 'PROGRESS_UPDATE',
+        message: resolutionSummaryPromise,
+      });
+    } catch (_error) {}
 
     return { result };
 
   } catch (error) {
     const errReult = `An error occurred while asking an expert: ${error}`;
     updateLog(errReult);
-    context.sendMessage(JSON.stringify({
-      status: 'PROGRESS_UPDATES',
-      completed_status_message: "The Expert wasn't able to help.",
-    }));
+    context.sendMessage({
+      type: 'PROGRESS_UPDATE',
+      message: "The Expert wasn't able to help.",
+    });
     return { result: errReult };
   }
 },

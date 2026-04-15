@@ -223,10 +223,10 @@ export const LintTool: MultiAgentTool = {
         };
     }
 
-    context.sendMessage(JSON.stringify({
-        status: "PROGRESS_UPDATES",
-        completed_status_message: `Linting \`${filename}\``,
-      })
+    context.sendMessage({
+        type: 'PROGRESS_UPDATE',
+        message: `Linting \`${filename}\``,
+      }
     );
 
     // Handle binary files first.
@@ -389,10 +389,10 @@ export const LintTool: MultiAgentTool = {
           output = resultPrefix ? `${resultPrefix}\n${noWarningsOrErrors}` : noWarningsOrErrors;
       }
 
-      context.sendMessage(JSON.stringify({
-        status: "PROGRESS_UPDATES",
-        completed_status_message: output,
-      }));
+      context.sendMessage({
+        type: 'PROGRESS_UPDATE',
+        message: output,
+      });
 
       return { result: output };
 

@@ -98,10 +98,10 @@ export const CodeRunnerTool: MultiAgentTool = {
    */
   async execute(params: Record<string, unknown>, context: MultiAgentToolContext): Promise<MultiAgentToolResult> {
     const updateProgress = (message: string) => {
-        context.sendMessage(JSON.stringify({
-        status: 'PROGRESS_UPDATES',
-        completed_status_message: message,
-        }));
+        context.sendMessage({
+        type: 'PROGRESS_UPDATE',
+        message: message,
+        });
     };
 
     const files = params['files'] as string[];
@@ -177,12 +177,14 @@ export const CodeRunnerTool: MultiAgentTool = {
         const memLimitKB = Math.floor(freeMemKB * MAX_MEM_PERCENTAGE);
         const memLimitMB = Math.floor(memLimitKB / 1024);
 
+        const isMac = os.platform() === 'darwin';
+        const ulimitCmd = isMac ? '' : `ulimit -v ${memLimitKB} && `;
+
         if (isPython) {
             updateProgress(`Executing Python script \`${mainScript}\` (Capped at ${memLimitMB}MB due to underlying hardware contraints)`);
             
             cmd = 'sh';
-            // Apply the dynamic memory limit via ulimit before running python
-            args = ['-c', `ulimit -v ${memLimitKB} && python3 ${mainScript}`];
+            args = ['-c', `${ulimitCmd}python3 ${mainScript}`];
             
             executionEnv = {
                 ...process.env,
@@ -198,7 +200,7 @@ export const CodeRunnerTool: MultiAgentTool = {
                 updateProgress(`Executing Rust Project (Cargo) (Capped at ${memLimitMB}MB)`);
                 
                 cmd = 'sh';
-                args = ['-c', `ulimit -v ${memLimitKB} && cargo run --release --quiet`];
+                args = ['-c', `${ulimitCmd}cargo run --release --quiet`];
             } else {
                 updateProgress(`Compiling and Executing Rust script \`${mainScript}\` (Execution capped at ${memLimitMB}MB due to underlying hardware contraints)`);
                 
@@ -206,7 +208,7 @@ export const CodeRunnerTool: MultiAgentTool = {
                 // 1. Compile a memory cap to protect the container from runaway compilation
                 const compileRes = await runScript(
                     'sh', 
-                    ['-c', `ulimit -v ${memLimitKB} && rustc ${mainScript} -o ${binaryName}`], 
+                    ['-c', `${ulimitCmd}rustc ${mainScript} -o ${binaryName}`],
                     tempDir, 
                     process.env, 
                     INSTALL_TIMEOUT_MS
@@ -221,7 +223,7 @@ export const CodeRunnerTool: MultiAgentTool = {
                 // 2. Execute the resulting binary WITH the same memory cap
                 const binaryPath = path.join(tempDir, binaryName);
                 cmd = 'sh';
-                args = ['-c', `ulimit -v ${memLimitKB} && ${binaryPath}`];
+                args = ['-c', `${ulimitCmd}${binaryPath}`];
             }
         }
 

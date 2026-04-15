@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { FuzzyReplaceResult } from "../momoa_core/types";
+import { FuzzyReplaceResult } from "../momoa_core/types.js";
 
 interface Match {
     startIndex: number;

@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-import { logFilename } from "../../config/config";
-import { MultiAgentToolContext, MultiAgentToolResult, ToolParsingResult } from "../../momoa_core/types";
-import { MultiAgentTool } from "../multiAgentTool";
+import { logFilename } from "../../config/config.js";
+import { MultiAgentToolContext, MultiAgentToolResult, ToolParsingResult } from "../../momoa_core/types.js";
+import { MultiAgentTool } from "../multiAgentTool.js";
 
 /**
  * Tool to append entries to the RESEARCH_LOG.md.
@@ -72,10 +72,10 @@ export const researchLogTool: MultiAgentTool = {
       message: successMsg,
     }));
 
-    context.sendMessage(JSON.stringify({
-        status: "PROGRESS_UPDATES",
-        completed_status_message: successMsg,
-      })
+    context.sendMessage({
+        type: 'PROGRESS_UPDATE',
+        message: successMsg,
+      }
     );
 
     return { result: successMsg };

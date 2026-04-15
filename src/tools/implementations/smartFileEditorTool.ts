@@ -123,10 +123,10 @@ export const smartFileEditorTool: MultiAgentTool = {
     transcriptManager.addEntry('user', completedPreamble);
 
     await updateLog(`### Smart Editor editing '${filename}`);
-    context.sendMessage(JSON.stringify({
-      status: 'PROGRESS_UPDATES',
-      completed_status_message: `Editing \`${filename}\``,
-    }));
+    context.sendMessage({
+      type: 'PROGRESS_UPDATE',
+      message: `Editing \`${filename}\``,
+    });
 
     // Attempt the edit directly first. The LLM loop is now a fallback.
     if (parameterExtractionResult.success) {
@@ -635,10 +635,10 @@ function editFile(filename: string, fromString: string, toString: string, contex
     message: worklog ?? result,
   }));
 
-  context.sendMessage(JSON.stringify({
-    status: 'PROGRESS_UPDATES',
-    completed_status_message: progressUpdate,
-  }));
+  context.sendMessage({
+    type: 'PROGRESS_UPDATE',
+    message: progressUpdate,
+  });
 
   return result;
 };

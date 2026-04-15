@@ -19,7 +19,7 @@
  */
 export async function resolveProjectSpecification(
   requestProjectSpecification?: string,
-  weaveId?: string
+  _weaveId?: string
 ): Promise<string> {
   let projectSpecification = requestProjectSpecification || "";
   return projectSpecification;
