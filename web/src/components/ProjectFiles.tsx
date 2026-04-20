@@ -45,7 +45,7 @@ export const ProjectFiles: React.FC<{ projectId: string }> = ({ projectId }) => 
         pastSessions.sort((a, b) => (a.metadata?.startedAt || 0) - (b.metadata?.startedAt || 0));
 
         for (const session of pastSessions) {
-          // Process initial uploads
+          // Process initial uploads (Fallback for older sessions that might still have them in the queue)
           if (session.actionQueue) {
             Object.values(session.actionQueue).forEach((action: any) => {
               if (action.status === "FILE_CHUNK" && action.data?.files) {
@@ -55,16 +55,24 @@ export const ProjectFiles: React.FC<{ projectId: string }> = ({ projectId }) => 
               }
             });
           }
-          // Process Agent results
+          
+          // Process ALL history items (Captures USER_MESSAGE uploads and COMPLETE_RESULT agent edits)
           if (session.history) {
-            const completeItem: any = Object.values(session.history).find((h: any) => h.status === "COMPLETE_RESULT");
-            if (completeItem?.data?.files) {
-              try {
-                const parsed = JSON.parse(completeItem.data.files);
-                parsed.forEach((f: any) => {
-                  if (!EXCLUDED_FILES.has(f.name.toLowerCase())) accumulated.set(f.name, f.content);
-                });
-              } catch (e) { console.warn("Parse error", e); }
+            const historyItems = Object.values(session.history) as any[];
+            // Sort chronologically so newer edits overwrite older initial uploads
+            historyItems.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+            for (const item of historyItems) {
+              if (item.data?.files) {
+                try {
+                  const parsed = JSON.parse(item.data.files);
+                  parsed.forEach((f: any) => {
+                    if (!EXCLUDED_FILES.has(f.name.toLowerCase())) accumulated.set(f.name, f.content);
+                  });
+                } catch (e) { 
+                  console.warn("Parse error", e); 
+                }
+              }
             }
           }
         }

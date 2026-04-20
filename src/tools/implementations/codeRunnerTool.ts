@@ -15,78 +15,13 @@
  */
 
 import * as path from 'path';
-import * as fs from 'fs/promises';
-import * as os from 'os';
-import { spawn } from 'child_process';
 import { MultiAgentTool } from '../multiAgentTool.js';
 import { MultiAgentToolResult, MultiAgentToolContext, ToolParsingResult } from '../../momoa_core/types.js';
 import { addDynamicallyRelevantFile, updateFileEntry } from '../../utils/fileAnalysis.js';
-import { logFilename, MAX_MEM_PERCENTAGE, MAX_SCRIPT_EXECUTION_TIMEOUT } from '../../config/config.js';
+import { logFilename, MAX_SCRIPT_EXECUTION_TIMEOUT } from '../../config/config.js';
+import { FilePayload, getExecutionProvider } from '../../services/executionProvider.js';
 
-const LARGE_FILE_LIMIT_KB = 100;
-const MAX_CONTEXT_FILE_SIZE_BYTES = 100 * 1024 * 1024;
-const PYTHON_REQUIRED_DEPS: string[] = [];//["numpy"]; 
-const INSTALL_TIMEOUT_MS = 300000; // 5 minutes for installation
-const EXECUTION_TIMEOUT_MS = MAX_SCRIPT_EXECUTION_TIMEOUT; // 10 minutes for script execution
-const DEPS_DIR_NAME = '_momoa_deps'; // Directory to isolate dependencies
-
-// Helper: Run script using spawn to avoid maxBuffer issues
-const runScript = (
-    cmd: string, 
-    args: string[], 
-    cwd: string, 
-    env: NodeJS.ProcessEnv, 
-    timeoutMs: number
-) => {
-    return new Promise<{stdout: string, stderr: string, timedOut: boolean, exitCode: number | null}>((resolve, reject) => {
-        const child = spawn(cmd, args, { cwd, env });
-        
-        let stdout = '';
-        let stderr = '';
-        let timedOut = false;
-        
-        // Cap collection to ~50MB to prevent memory exhaustion
-        const MAX_LOG_SIZE = LARGE_FILE_LIMIT_KB * 2 * 1024; 
-
-        const appendLog = (currentLog: string, newData: string) => {
-            const combined = currentLog + newData;
-            if (combined.length > MAX_LOG_SIZE) {
-                return `[---Output Truncated Due to Length---]\n${combined.slice(-MAX_LOG_SIZE)}`;
-            }
-            return combined;
-        };
-
-        child.stdout.on('data', (data) => {
-            stdout = appendLog(stdout, data.toString());
-        });
-
-        child.stderr.on('data', (data) => {
-            stderr = appendLog(stderr, data.toString());
-        });
-
-        const timer = setTimeout(() => {
-            timedOut = true;
-            child.kill('SIGTERM'); // Polite request
-            
-            // If the script is stubborn and hasn't closed after 2 seconds, drop the hammer.
-            setTimeout(() => {
-                if (!child.killed) {
-                    try { child.kill('SIGKILL'); } catch (e) {}
-                }
-            }, 2000);
-        }, timeoutMs);
-
-        child.on('close', (code) => {
-            clearTimeout(timer);
-            resolve({ stdout, stderr, timedOut, exitCode: code });
-        });
-
-        child.on('error', (err) => {
-            clearTimeout(timer);
-            reject(err);
-        });
-    });
-};
+const EXECUTION_TIMEOUT_MS = MAX_SCRIPT_EXECUTION_TIMEOUT;
 
 export const CodeRunnerTool: MultiAgentTool = {
   displayName: "Code Runner",
@@ -106,7 +41,6 @@ export const CodeRunnerTool: MultiAgentTool = {
 
     const files = params['files'] as string[];
 
-    // 1. Validation
     if (!files || files.length === 0) {
       updateProgress("Error: No files provided to execute.");
       return { result: "Error: No files provided to execute." };
@@ -118,213 +52,123 @@ export const CodeRunnerTool: MultiAgentTool = {
     const isRust = ext === '.rs';
     const isPython = ext === '.py';
 
+    let provider = getExecutionProvider(context); 
+
+    if (!provider) {
+        updateProgress(`Requested tool execution environment (${context.toolExecutionEnvironment}) is unavailable. Using default 'Local' environment.`);
+        provider = getExecutionProvider(undefined);
+        if (!provider) {
+            updateProgress(`No tool execution environment available. Cancelling Tool.`);
+            const noEnvironmentString = `Error running tool: No execution environment was availble. Requested '${context.toolExecutionEnvironment}' which was unavailable. Defaulted to 'Local' which also failed. Tool is unavailable at this time.`;
+            return { result: noEnvironmentString };
+        }
+    }   
+    updateProgress(`Running code via ${provider.providerName}.`);
+
     if (!isRust && !isPython) {
         updateProgress(`Error: Unsupported file type '${ext}'`);
         return { result: `Error: Unsupported file type '${ext}'. Please provide .py or .rs files.` };
     }
 
-    // 2. Prepare Temp Directory
-    let tempDir = '';
-    try {
-        tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'momoa-run-'));
-        
-        // --- Dependency Setup ---
-        const depsPath = path.join(os.tmpdir(), DEPS_DIR_NAME);
-        await fs.mkdir(depsPath, { recursive: true });
-
-        // Python Dependencies
-        if (isPython && PYTHON_REQUIRED_DEPS.length > 0) {
-            try {
-                await runScript('python3', ['-m', 'pip', 'install', '--target', depsPath, ...PYTHON_REQUIRED_DEPS], tempDir, process.env, INSTALL_TIMEOUT_MS);
-            } catch (e) {
-                 updateProgress(`Dependency Installation Failed: ${e}`);
-                 return { result: `Dependency Installation Failed: ${e}` };
-            }
-        }
-
-        // 3. Stage Files
-        const stageFile = async (fileName: string) => {
-             const content = context.fileMap.get(fileName);
-             const targetPath = path.join(tempDir, fileName);
-             const targetDir = path.dirname(targetPath);
-
-             await fs.mkdir(targetDir, { recursive: true });
-
-             if (content === undefined) {
-                 if (context.binaryFileMap.has(fileName)) {
-                     const buf = Buffer.from(context.binaryFileMap.get(fileName)!, 'base64');
-                     await fs.writeFile(targetPath, buf);
-                     return;
-                 }
-                 throw new Error(`File '${fileName}' not found in context.`);
-             }
-             await fs.writeFile(targetPath, content, 'utf8');
-        };
-
-        await stageFile(mainScript);
-        for (const file of otherFiles) {
-            await stageFile(file);
-        }
-
-        // 4. Execution Logic
-        let cmd = '';
-        let args: string[] = [];
-        let executionEnv = { ...process.env };
-        let compileOutput = '';
-
-        // Calculate 80% of currently free memory in Kilobytes
-        const freeMemKB = Math.floor(os.freemem() / 1024);
-        const memLimitKB = Math.floor(freeMemKB * MAX_MEM_PERCENTAGE);
-        const memLimitMB = Math.floor(memLimitKB / 1024);
-
-        const isMac = os.platform() === 'darwin';
-        const ulimitCmd = isMac ? '' : `ulimit -v ${memLimitKB} && `;
-
-        if (isPython) {
-            updateProgress(`Executing Python script \`${mainScript}\` (Capped at ${memLimitMB}MB due to underlying hardware contraints)`);
-            
-            cmd = 'sh';
-            args = ['-c', `${ulimitCmd}python3 ${mainScript}`];
-            
-            executionEnv = {
-                ...process.env,
-                PYTHONPATH: tempDir + path.delimiter + depsPath + path.delimiter + (process.env.PYTHONPATH || ''),
-                PYTHONUNBUFFERED: '1'
-            };
-        }
-        else if (isRust) {
-            // Check for Cargo.toml in the staged files
-            const hasCargo = files.some(f => f.endsWith('Cargo.toml'));
-
-            if (hasCargo) {
-                updateProgress(`Executing Rust Project (Cargo) (Capped at ${memLimitMB}MB)`);
-                
-                cmd = 'sh';
-                args = ['-c', `${ulimitCmd}cargo run --release --quiet`];
-            } else {
-                updateProgress(`Compiling and Executing Rust script \`${mainScript}\` (Execution capped at ${memLimitMB}MB due to underlying hardware contraints)`);
-                
-                const binaryName = 'main_bin';                
-                // 1. Compile a memory cap to protect the container from runaway compilation
-                const compileRes = await runScript(
-                    'sh', 
-                    ['-c', `${ulimitCmd}rustc ${mainScript} -o ${binaryName}`],
-                    tempDir, 
-                    process.env, 
-                    INSTALL_TIMEOUT_MS
-                );
-
-                if (compileRes.exitCode !== 0) {
-                    return { result: `Rust Compilation Failed (or ran out of memory):\n${compileRes.stderr}\n${compileRes.stdout}` };
-                }
-                
-                if (compileRes.stderr) compileOutput += `[Compilation Warning]: ${compileRes.stderr}\n`;
-
-                // 2. Execute the resulting binary WITH the same memory cap
-                const binaryPath = path.join(tempDir, binaryName);
-                cmd = 'sh';
-                args = ['-c', `${ulimitCmd}${binaryPath}`];
-            }
-        }
-
-        // Run the command
-        const { stdout, stderr, timedOut, exitCode } = await runScript(
-            cmd, 
-            args, 
-            tempDir, 
-            executionEnv, 
-            EXECUTION_TIMEOUT_MS
-        );
-
-        let result = compileOutput;
-
-        if (timedOut) {
-            result += `Error: Execution timed out after ${EXECUTION_TIMEOUT_MS / 1000} seconds.\n`;
-        } else if (exitCode !== 0) {
-            result += `Error: Process exited with code ${exitCode}.\n`;
+    const filesToStage: FilePayload[] = [];
+    for (const file of [mainScript, ...otherFiles]) {
+        if (context.fileMap.has(file)) {
+            filesToStage.push({
+                path: file,
+                content: Buffer.from(context.fileMap.get(file)!).toString('base64'),
+                isBinary: false
+            });
+        } else if (context.binaryFileMap.has(file)) {
+            filesToStage.push({
+                path: file,
+                content: context.binaryFileMap.get(file)!,
+                isBinary: true
+            });
         } else {
-            result += `Execution successful.\n`;
-        }
-
-        updateProgress(result);
-
-        // 5. Post-Execution: Scan for Output Files
-        const normalizedInputFiles = new Set(files.map(f => path.normalize(f)));
-        if (isRust) normalizedInputFiles.add('main_bin'); // Exclude the binary we created
-
-        const getFilesRecursively = async (dir: string): Promise<string[]> => {
-            const entries = await fs.readdir(dir, { withFileTypes: true });
-            const files = await Promise.all(entries.map(async (entry) => {
-                const res = path.join(dir, entry.name);
-                return entry.isDirectory() ? getFilesRecursively(res) : res;
-            }));
-            return Array.prototype.concat(...files);
-        };
-
-        const allFilesInTemp = await getFilesRecursively(tempDir);
-        const generatedFiles: string[] = [];
-
-        for (const fullPath of allFilesInTemp) {
-            let relativePath = path.relative(tempDir, fullPath);
-
-            if (normalizedInputFiles.has(relativePath)) continue;
-            
-            let baseName = path.basename(relativePath);
-
-            // Intercept and rename RESEARCH_LOG.MD to CODE_RUNNER_LOG.md
-            if (baseName.toUpperCase() === logFilename.toUpperCase()) {
-                const dirName = path.dirname(relativePath);
-                const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
-                baseName = `CODE_RUNNER_RESEARCH_LOG_${timestamp}.md`;
-                relativePath = dirName === '.' ? baseName : path.join(dirName, baseName);
-            }
-
-            // Skip common build artifacts
-            if (baseName.startsWith('.') || relativePath.includes('__pycache__') || baseName.endsWith('.pyc')) continue;
-            if (baseName === 'target' || relativePath.startsWith('target/')) continue; // Skip Cargo target dir
-
-            const stats = await fs.stat(fullPath);
-
-            if (stats.isFile()) {
-                if (stats.size > MAX_CONTEXT_FILE_SIZE_BYTES) {
-                     result += `\n[Warning] File '${relativePath}' generated but exceeds size limit.\n`;
-                }
-
-                const contentBuffer = await fs.readFile(fullPath);
-                const isBinary = contentBuffer.subarray(0, 1024).includes(0);
-                const isTooLarge = contentBuffer.length > (LARGE_FILE_LIMIT_KB * 1024);
-                
-                if (isBinary || isTooLarge) {
-                     context.binaryFileMap.set(relativePath, contentBuffer.toString('base64'));
-                } else {
-                  context.fileMap.set(relativePath, contentBuffer.toString('utf8'));
-                  await updateFileEntry(relativePath, context.fileMap, context.multiAgentGeminiClient);
-                }
-                
-                context.editedFilesSet.add(relativePath);
-                addDynamicallyRelevantFile(relativePath);
-                generatedFiles.push(relativePath);
-            }
-        }
-
-        if (generatedFiles.length > 0) {
-            updateProgress(`The following files were generated: ${generatedFiles.join(', ')}`);
-            result += `\nGenerated Files: ${generatedFiles.join(', ')}\n`;
-        }
-
-        if (stdout && stdout.trim()) result += `\n--- STDOUT ---\n${stdout.trim()}\n`;
-        if (stderr && stderr.trim()) result += `\n--- STDERR ---\n${stderr.trim()}\n`;
-
-        return { result: result };
-    } catch (e: any) {
-        updateProgress(`System Error: ${e.message}`);
-        return { result: `System Error: ${e.message}` };
-    } finally {
-        // Cleanup temp directory
-        if (tempDir) {
-            try { await fs.rm(tempDir, { recursive: true, force: true }); } catch (e) { /* ignore */ }
+             return { result: `Error: File '${file}' not found in context.` };
         }
     }
+
+    // Command Generation (Cleaned up, no memory logic here)
+    let command = 'sh';
+    let args: string[] = [];
+    
+    if (isPython) {
+        updateProgress(`Executing Python script \`${mainScript}\``);
+        args = ['-c', `python3 ${mainScript}`];
+    } else if (isRust) {
+        const hasCargo = files.some(f => f.endsWith('Cargo.toml'));
+        if (hasCargo) {
+            updateProgress(`Executing Rust Project (Cargo)`);
+            args = ['-c', `cargo run --release --quiet`];
+        } else {
+            updateProgress(`Compiling and Executing Rust script \`${mainScript}\``);
+            args = ['-c', `rustc ${mainScript} -o main_bin && ./main_bin`];
+        }
+    }
+
+    const request = {
+      command,
+      args,
+      files: filesToStage,
+      timeoutMs: EXECUTION_TIMEOUT_MS,
+    };
+
+    const executionResult = await provider.execute(request);
+
+    if (executionResult.error) {
+      updateProgress(`Execution failed: ${executionResult.error}`);
+      return { result: `System Error: ${executionResult.error}` };
+    }
+
+    let resultStr = ``;
+    if (executionResult.timedOut) resultStr += `Error: Execution timed out.\n`;
+    else if (executionResult.exitCode !== 0) resultStr += `Error: Process exited with code ${executionResult.exitCode}.\n`;
+    else resultStr += `Execution successful.\n`;
+
+    const generatedFileNames: string[] = [];
+    for (const genFile of executionResult.generatedFiles) {
+        let relativePath = genFile.path;
+        let baseName = path.basename(relativePath);
+        if (baseName.toUpperCase() === logFilename.toUpperCase()) {
+            const dirName = path.dirname(relativePath);
+            const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+            baseName = `CODE_RUNNER_RESEARCH_LOG_${timestamp}.md`;
+            relativePath = dirName === '.' ? baseName : path.join(dirName, baseName);
+        }
+
+        if (genFile.isBinary) {
+            context.binaryFileMap.set(relativePath, genFile.content);
+        } else {
+            const decodedText = Buffer.from(genFile.content, 'base64').toString('utf8');
+            context.fileMap.set(relativePath, decodedText);
+            await updateFileEntry(relativePath, context.fileMap, context.multiAgentGeminiClient);
+        }
+        
+        context.editedFilesSet.add(relativePath);
+        addDynamicallyRelevantFile(relativePath);
+        generatedFileNames.push(relativePath);
+    }
+
+    if (generatedFileNames.length > 0) {
+        updateProgress(`The following files were generated: ${generatedFileNames.join(', ')}`);
+        resultStr += `\nGenerated Files: ${generatedFileNames.join(', ')}\n`;
+    }
+
+    let progressString = `Execution of \`${mainScript}\` ${executionResult.exitCode === 0 ? "was successful:" : "failed:"}`;
+
+    if (executionResult.stdout?.trim()) {
+      resultStr += `\n--- STDOUT ---\n${executionResult.stdout.trim()}\n`;
+      progressString += `\n\`\`\`\`\n${executionResult.stdout.trim()}\n\`\`\`\``
+    }
+    if (executionResult.stderr?.trim()) {
+      resultStr += `\n--- STDERR ---\n${executionResult.stderr.trim()}\n`;
+      progressString += `\nExit Code ${executionResult.exitCode}. \n\`\`\`\`\n${executionResult.stderr.trim()}\n\`\`\`\``
+    }
+
+    updateProgress(progressString);
+
+    return { result: resultStr };
   },
 
   /**

@@ -25,7 +25,7 @@ import {
   InitialRequestData,
   SESSION_ROOT_PATH,
   USERINFO_ROOT_PATH,
-  PROJECT_ROOT_PATH, 
+  PROJECT_ROOT_PATH,
 } from "../../../src/shared/model";
 import { useAuthContext } from "../auth/AuthProvider";
 import { Header } from "../components/Header";
@@ -82,12 +82,25 @@ export function DashboardPage() {
       projectId: projectId, // Link session to the newly created project
     } satisfies SessionMetadata);
 
-    push(child(sessionRef, "history"), {
+    const initialFiles = attachments
+      .filter((a) => a.type === "files")
+      .flatMap((a) => a.files)
+      .map(({ path, textContent }) => ({
+        name: path,
+        content: b64encode(textContent),
+      }));
+
+    const historyItem: HistoryItem = {
       status: "USER_MESSAGE",
       message: prompt.trim(),
       timestamp: Date.now(),
       runnerInstanceId: "local-client",
-    } satisfies HistoryItem);
+    };
+    
+    if (initialFiles.length > 0) {
+      historyItem.data = { files: JSON.stringify(initialFiles) };
+    }
+    push(child(sessionRef, "history"), historyItem);
 
     const requestData: InitialRequestData = {
       secrets: {
@@ -96,7 +109,6 @@ export function DashboardPage() {
         githubToken: prefs.githubToken || "",
         julesApiKey: prefs.julesApiKey || "",
         stitchApiKey: prefs.stitchApiKey || "",
-        e2BApiKey: prefs.e2BApiKey || ""
       },
       githubUrl: (attachments.find((a) => a.type === "git-repo")?.repoUrl || null) as string | undefined,
       image: image || "",
@@ -104,6 +116,7 @@ export function DashboardPage() {
       llmName: "gemini-2.5-flash",
       prompt: prompt.trim(),
       notWorkingBuild: notWorkingBuild,
+      toolExecutionEnvironment: prefs.toolRunEnvironment
     };
 
     requestData.assumptions = "* If the Project Definition implies that the project files have been provided and should be available, but there are no files available to you, you MUST seek clarification from the user.";

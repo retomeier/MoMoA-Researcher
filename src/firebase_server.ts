@@ -531,6 +531,7 @@ async function handleInitialRequest(
       image,
       imageMimeType,
       weaveId,
+      toolExecutionEnvironment
     } = requestData as InitialRequestData & { projectId?: string; mode?: string; projectSpecification?: string };
 
     const projectSpecification = await resolveProjectSpecification(requestProjectSpecification, weaveId);
@@ -743,6 +744,7 @@ if (githubUrl) {
           mode as ServerMode | undefined,
           SERVER_MAX_DURATION_MS,
           SERVER_GRACE_PERIOD_MS,
+          toolExecutionEnvironment
         );
 
     session.runner = runner;

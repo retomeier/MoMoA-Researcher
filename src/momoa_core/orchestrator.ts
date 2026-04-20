@@ -82,6 +82,7 @@ export class Orchestrator {
   private maxDurationMs?: number;
   private gracePeriodMs?: number;
   private hasWarnedTimeLow: boolean = false;
+  private toolExecutionEnvironment: string;
 
   /**
    * Initializes a new instance of the Orchestrator.
@@ -117,7 +118,8 @@ export class Orchestrator {
     signal?: AbortSignal,
     mode?: ServerMode,
     maxDurationMs?: number,
-    gracePeriodMs?: number
+    gracePeriodMs?: number,
+    toolExecutionEnvironment?: string,
   ) {
     this.initialPrompt = initialPrompt;
     this.initialImage = initialImage;
@@ -155,6 +157,8 @@ export class Orchestrator {
     this.maxDurationMs = maxDurationMs ?? undefined; 
     this.gracePeriodMs = gracePeriodMs ?? undefined;
 
+    this.toolExecutionEnvironment = toolExecutionEnvironment ?? "LOCAL";
+
     this.toolContext = {
       fileMap: this.fileMap,
       binaryFileMap: this.binaryFileMap,
@@ -181,6 +185,7 @@ export class Orchestrator {
       projectSpecification: this.projectSpecification,
       environmentInstructions: this.environmentInstructions,
       notWorkingBuild: this.notWorkingBuild,
+      toolExecutionEnvironment: this.toolExecutionEnvironment,
       sessionTitle: this.sessionTitle,
     };
   }

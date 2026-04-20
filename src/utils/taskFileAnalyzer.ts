@@ -170,6 +170,7 @@ export async function analyzeRelevantFilesForTask(
     julesBranchName: null,
     saveFiles: false,
     secrets: {} as any,
+    toolExecutionEnvironment: ""
   };
   
   const toolPrefix = await getAssetString('tool-prefix');

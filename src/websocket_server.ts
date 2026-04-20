@@ -349,7 +349,6 @@ async function handleInitialRequest(clientUUID: string, requestData: InitialRequ
       julesApiKey: process.env.JULES_API_KEY || '',
       githubToken: process.env.GITHUB_TOKEN || '',
       stitchApiKey: process.env.STITCH_API_KEY || '',
-      e2BApiKey: process.env.E2B_API_KEY || '',
       githubScratchPadRepo: process.env.GITHUB_SCRATCHPAD_REPO || '',
     };
 

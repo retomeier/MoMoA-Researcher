@@ -27,7 +27,7 @@ export type Prefs = {
   githubToken?: string;
   githubScratchPad?: string;
   showDebugInfo?: boolean;
-  e2BApiKey?: string;
+  toolRunEnvironment?: string;
 };
 
 const initialPrefs: Prefs = (() => {

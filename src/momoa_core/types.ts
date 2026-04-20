@@ -67,6 +67,10 @@ export enum VerbosityType {
   Quiet = 'QUIET'
 }
 
+export enum ToolExecutionEnvironmentType {
+  Local = "LOCAL",
+}
+
 export interface MultiAgentToolContext {
   initialPrompt: string;
   initialImage?: string;
@@ -97,6 +101,7 @@ export interface MultiAgentToolContext {
   signal?: AbortSignal;
   projectDeadlineMs?: number;
   gracePeriodMs?: number;
+  toolExecutionEnvironment: string;
   sessionTitle: string;
 }
 

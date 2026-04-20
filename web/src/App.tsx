@@ -25,8 +25,8 @@ import { ResearchProjectPage } from "./pages/ResearchProjectPage";
 
 export function App() {
   return (
-    <AuthProvider>
-      <PrefsProvider>
+    <PrefsProvider>
+      <AuthProvider>
         <ToastProvider>
           <div className="app">
             <OnboardGate>
@@ -50,7 +50,7 @@ export function App() {
             </OnboardGate>
           </div>
         </ToastProvider>
-      </PrefsProvider>
-    </AuthProvider>
+      </AuthProvider>
+    </PrefsProvider>
   );
 }

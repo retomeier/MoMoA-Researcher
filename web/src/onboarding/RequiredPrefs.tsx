@@ -15,9 +15,10 @@
  */
 
 
+import JulesIcon from "@/icons/JulesIcon";
 import { Prefs, usePrefsContext } from "@/util/PrefsProvider";
 import { Flex, TextField, Tooltip } from "@radix-ui/themes";
-import { GithubIcon, KeyIcon } from "lucide-react";
+import { FileCodeIcon, GithubIcon, KeyIcon, LayersIcon } from "lucide-react";
 
 export function areRequiredPrefsSet(prefs: Prefs) {
   return (
@@ -44,6 +45,7 @@ export function RequiredPrefs() {
           onFocus={(ev) => ev.currentTarget.select()}
         >
           <TextField.Slot>
+            <Tooltip content="Gemini API Key"></Tooltip>
             <KeyIcon size={16} />
           </TextField.Slot>
         </TextField.Root>
@@ -60,6 +62,54 @@ export function RequiredPrefs() {
           <TextField.Slot>
             <Tooltip content="Personal access token for GitHub">
               <GithubIcon size={16} />
+            </Tooltip>
+          </TextField.Slot>
+        </TextField.Root>
+        <TextField.Root
+          value={prefs.julesApiKey || ""}
+          placeholder="Jules API Key"
+          onChange={(ev) =>
+            updatePrefs({
+              julesApiKey: ev.currentTarget.value,
+            })
+          }
+          onFocus={(ev) => ev.currentTarget.select()}
+        >
+          <TextField.Slot>
+            <Tooltip content="Jules API Key">
+              <JulesIcon size={16} />
+            </Tooltip>
+          </TextField.Slot>
+        </TextField.Root>
+        <TextField.Root
+          value={prefs.githubScratchPad || ""}
+          placeholder="Github Scratchpad"
+          onChange={(ev) =>
+            updatePrefs({
+              githubScratchPad: ev.currentTarget.value,
+            })
+          }
+          onFocus={(ev) => ev.currentTarget.select()}
+        >
+          <TextField.Slot>
+            <Tooltip content="Github Scratchpad">
+              <FileCodeIcon size={16} />
+            </Tooltip>
+          </TextField.Slot>
+        </TextField.Root>
+        <TextField.Root
+          value={prefs.stitchApiKey || ""}
+          placeholder="Stitch API Key"
+          onChange={(ev) =>
+            updatePrefs({
+              stitchApiKey: ev.currentTarget.value,
+            })
+          }
+          onFocus={(ev) => ev.currentTarget.select()}
+        >
+          <TextField.Slot>
+            <Tooltip content="Stitch API Key">
+              <LayersIcon size={16} />
             </Tooltip>
           </TextField.Slot>
         </TextField.Root>

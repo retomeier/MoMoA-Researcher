@@ -67,6 +67,7 @@ export interface InitialRequestData {
   weaveId?: string;
   maxDurationMs?: number;
   gracePeriodMs?: number;
+  toolExecutionEnvironment?: string;
 }
 
 export interface UserSecrets {
@@ -74,7 +75,6 @@ export interface UserSecrets {
   julesApiKey: string;
   githubToken: string;
   stitchApiKey: string;
-  e2BApiKey: string;
   githubScratchPadRepo: string;
 }
 

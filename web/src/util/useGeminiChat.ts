@@ -295,7 +295,7 @@ export const useGeminiChat = (projectId: string | undefined, chatContext: string
                     }
                 );
 
-                const candidate = response.candidates?.[0];
+                const candidate = response?.candidates?.[0];
                 const parts = candidate?.content?.parts || [];
                 
                 const functionCalls = parts
@@ -378,7 +378,7 @@ export const useGeminiChat = (projectId: string | undefined, chatContext: string
                 } else {
                     isToolCall = false;
                     // It's a pure text response
-                    modelResponseText = response.text;
+                    modelResponseText = response?.text ?? "";
                 }
             }
 

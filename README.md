@@ -103,6 +103,15 @@ This triggers both `npm run dev:web` (Vite on standard port) and `npm run dev:se
 ## Limitations
 Be aware that the current orchestration is designed such that the Service, Code Runner, and Optimier all run within the same VM. If you are doing heavy algorithmic optimization, the compute bottleneck is significant. Scaled deployments would require modifying the Optimizer and Code Runner to spin up parallelized infrastructure.
 
+### Adding Support for Jules and Stitch Tools
+To enable MoMoA to use the [Stitch](https://stitch.withgoogle.com) and [Jules](https://jules.google.com/) Tools you must sign-up for Jules and / or Stitch, obtain API keys:
+* `JULES_API_KEY` can be obtained from Jules following [these instructions](https://developers.google.com/jules/api).
+* `STITCH_API_KEY` can be obtained from the Stitch [settings page](https://stitch.withgoogle.com/settings).
+
+The Jules API doesn't currently support repo-less tasks, so you must also provide a GitHub access token that has access to a GitHub repository that is connected to Jules, and in which we can create a temporary branch that the Jules Tool will use to provide access to Jules:
+* `GITHUB_TOKEN` can be obtained from [GitHub Developer Settings](https://github.com/settings/tokens).
+* `GITHUB_SCRATCHPAD_REPO` (Eg. `myusername/my-private-jules-scratchpad-repo`).
+
 ## About this Project
 
 Project Home Page:

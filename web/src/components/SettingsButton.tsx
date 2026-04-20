@@ -23,6 +23,7 @@ import {
   Switch,
   Text,
   Tooltip,
+  Select,
 } from "@radix-ui/themes";
 import { Settings2Icon } from "lucide-react";
 
@@ -56,15 +57,34 @@ export function SettingsButton() {
         </Popover.Trigger>
       </Tooltip>
       <Popover.Content width="360px">
-        <Flex direction="column" gap="2">
+        <Flex direction="column" gap="3"> {/* Increased gap for better spacing */}
           <RequiredPrefs />
+          
+          <hr style={{ border: '0', borderTop: '1px solid var(--gray-5)', margin: '4px 0' }} />
+
+          {/* Tool Environment Selector */}
+          <Flex direction="column" gap="1">
+            <Text size="1" weight="bold" color="gray" mb="1">
+              Code Tool Execution Environment
+            </Text>
+            <Select.Root 
+              value={prefs.toolRunEnvironment || "Local"} 
+              onValueChange={(value) => updatePrefs({ toolRunEnvironment: value })}
+            >
+              <Select.Trigger placeholder="Select tool execution environment..." />
+              <Select.Content>
+                <Select.Item value="LOCAL">Server's Host Environment</Select.Item>
+              </Select.Content>
+            </Select.Root>
+          </Flex>
+
           <label style={{ cursor: "pointer" }}>
             <Flex gap="2" align="center">
               <Switch
                 checked={prefs.showDebugInfo}
                 size="1"
-                onClick={() =>
-                  updatePrefs({ showDebugInfo: !prefs.showDebugInfo })
+                onCheckedChange={(checked) => // Used onCheckedChange for better Radix compatibility[cite: 1]
+                  updatePrefs({ showDebugInfo: checked })
                 }
               />
               <Text color="gray" size="2" style={{ flexGrow: 1 }}>
