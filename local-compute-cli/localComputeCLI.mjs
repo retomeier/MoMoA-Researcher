@@ -124,7 +124,6 @@ async function handleSingleTask(data) {
 
 // --- Execution & Sweeping Logic ---
 async function executeLocalTask(request) {
-    console.log(`Executing Local Task: ${request.command} ${request.args}`);
     const localStagingDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-run-'));
     const originalFilesMap = new Map();
     let timedOut = false;
@@ -190,8 +189,6 @@ async function executeLocalTask(request) {
                 }
             }
         }
-
-        console.log(`Local Compute Args: ${args}`);
         
         // Conditionally Apply OS Memory Limits (Linux only)
         if (os.platform() === 'linux' && request.command === 'sh' && args[0] === '-c') {
