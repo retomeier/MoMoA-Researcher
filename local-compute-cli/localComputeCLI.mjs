@@ -204,6 +204,10 @@ async function executeLocalTask(request) {
         const startTime = Date.now();
         const { stdout, stderr, exitCode, timeoutTriggered, peakMemory } = await new Promise((resolve) => {
             const child = spawn(request.command, args, { cwd: executionCwd, env, shell: true });
+
+            if (child.stdin)
+              child.stdin.end();
+
             let out = '', err = '', isDone = false;
             let peakMemoryTracker = 0, memInterval = null;
 
