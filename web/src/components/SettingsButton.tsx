@@ -65,15 +65,20 @@ export function SettingsButton() {
           {/* Tool Environment Selector */}
           <Flex direction="column" gap="1">
             <Text size="1" weight="bold" color="gray" mb="1">
-              Code Tool Execution Environment
+              Execution Environment
             </Text>
             <Select.Root 
               value={prefs.toolRunEnvironment || "Local"} 
               onValueChange={(value) => updatePrefs({ toolRunEnvironment: value })}
             >
-              <Select.Trigger placeholder="Select tool execution environment..." />
+              <Select.Trigger placeholder="Select execution environment..." />
               <Select.Content>
                 <Select.Item value="LOCAL">Server's Host Environment</Select.Item>
+                <Select.Item value="CLOUDRUN">Cloud Run Jobs</Select.Item>
+                <Select.Item value="CLOUDSHELLEDITOR">Cloud Shell Editor</Select.Item>
+                <Select.Item value="CLOUDWORKSTATION">Cloud Workstation</Select.Item>
+                <Select.Item value="E2B">E2B.dev</Select.Item>
+                <Select.Item value="REMOTE_DESKTOP_AGENT">Remote Desktop</Select.Item>
               </Select.Content>
             </Select.Root>
           </Flex>
