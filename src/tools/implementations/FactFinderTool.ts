@@ -16,12 +16,14 @@
 
 import { MultiAgentTool } from '../multiAgentTool.js';
 import { addFAQ } from '../../utils/faqs.js';
-import { MultiAgentToolContext, MultiAgentToolResult, ToolParsingResult } from '../../momoa_core/types.js';
+import { MultiAgentToolContext, MultiAgentToolResult, ToolExecutionEnvironmentType, ToolParsingResult } from '../../momoa_core/types.js';
 import { DEFAULT_GEMINI_FLASH_MODEL, DEFAULT_GEMINI_LITE_MODEL, DEFAULT_GEMINI_PRO_MODEL } from '../../config/models.js';
 import { removeBacktickFences } from '../../utils/markdownUtils.js';
 import { getAssetString, getToolPreamblePrompt, replaceRuntimePlaceholders } from '../../services/promptManager.js';
 import { TranscriptManager } from '../../services/transcriptManager.js';
 import { Part } from '@google/genai';
+import { ExecutionRequest } from '../../services/executionProvider.js';
+import { RemoteDesktopExecutionProvider } from '../../services/executionProviders/remoteDesktopExecutionProvider.js';
 
 /**
  * Helper function to fetch content from a URL and summarize it using an LLM.
@@ -73,6 +75,44 @@ ${data}`;
  
   return result;
 }
+
+async function localLookup(question: string, context: MultiAgentToolContext): Promise<string> {
+  const localQuery = `"${question}"`;
+
+  if (context.toolExecutionEnvironment !== ToolExecutionEnvironmentType.Remote_Desktop_Agent)
+    return "---No Additional Information Available---\n\n(User must select 'Remote Desktop Execution Environment' for Local File Context)";
+
+  if (!context.secrets.remoteDesktopKey) 
+    return "---No Additional Information Available---\n\n(User has not provided a 'Remote Desktop Execution Environment' key)";
+
+  context.sendMessage({
+    type: "PROGRESS_UPDATES",
+    message: `Dispatching local agent to find facts.`,
+  });
+  
+  let provider = new RemoteDesktopExecutionProvider(context.secrets.remoteDesktopKey);
+  const executionRequest: ExecutionRequest = {
+      command: 'node',
+      args: ['local_fact_finder.js', localQuery], 
+  }
+
+  const execResult = await provider.execute(executionRequest);
+
+  // Safely capture stdout, falling back to stderr or a generic error if the script failed
+  let execResultString = execResult.stdout.trim();
+  
+  if (!execResultString || execResult.exitCode !== 0) {
+      const errorDetails = execResult.stderr || execResult.error || "Unknown execution failure";
+      execResultString = `Error executing local agent: ${errorDetails}`;
+  }
+
+  context.sendMessage(JSON.stringify({
+    status: "PROGRESS_UPDATES",
+    completed_status_message: `The local agent says:\n${execResultString}`,
+  }));
+
+  return execResultString;
+}
  
 /**
  * Implements the Fact Finder Tool, which consolidates information from project files (Docs)
@@ -97,7 +137,6 @@ export const factFinderTool: MultiAgentTool = {
 
     await updateLog(`${this.displayName} Invoked for question: ${question}`);
  
-    let providedInformation = "---No Additional Information Provided---";
     let internetSearchResult = "Internet Search Provided No Useful Results";
  
     // --- 2. Internet Search Part ---
@@ -200,6 +239,7 @@ ${question}`;
       internetSearchResult = `Internet Search Failed Due to Error: ${errorMessage}`;
     }
  
+    const localLookupResult = await localLookup(question, context);
  
     // --- 3. Final Synthesis ---
     context.sendMessage({
@@ -208,7 +248,7 @@ ${question}`;
     });
 
     const replacementValues = {
-      ExplicitlyProvided: providedInformation,
+      ExplicitlyProvided: localLookupResult,
       SearchResults: internetSearchResult,
       Question: question
     };
