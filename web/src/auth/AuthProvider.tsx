@@ -30,6 +30,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { usePrefsContext } from "@/util/PrefsProvider";
 
 const MOCK_INFO = [
   { name: "Taylor", img: "52" },
@@ -62,9 +63,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [hasAccess, setHasAccess] = useState<string | null>(null);
   const [authLoaded, setAuthLoaded] = useState(false);
 
+  const { updatePrefs } = usePrefsContext();
+
   const signIn = useCallback(async () => {
-    await signInWithPopup(auth, new GoogleAuthProvider());
-  }, []);
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
+  }, [updatePrefs]);
 
   const _signOut = useCallback(async () => {
     await signOut(auth);

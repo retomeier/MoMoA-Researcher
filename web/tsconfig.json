@@ -24,6 +24,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "../src/shared"],
+  "include": ["src", "../src/shared", "../src/firebase-config.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
