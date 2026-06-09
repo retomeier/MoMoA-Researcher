@@ -34,14 +34,13 @@ import { getFAQs } from '../utils/faqs.js';
 import { analyzeAndSetTaskRelevantFiles, analyzeFiles, getTaskRelevantFileDescriptions } from '../utils/fileAnalysis.js';
 import { removeBacktickFences, replaceContentBetweenMarkers } from '../utils/markdownUtils.js';
 import { enrichPrompt } from '../utils/promptEnrichment.js';
-import { Overseer } from './overseer.js'; // Import the Overseer class and Manager
+import { Overseer } from './overseer.js';
 import { MultiAgentToolContext, ToolConfirmationOutcome, GuidanceType, InfrastructureContext } from './types.js';
-import { WorkPhase } from './workPhase.js'; // Import the WorkPhase class
+import { WorkPhase } from './workPhase.js';
 import { LlmBlockedError } from '../shared/errors.js';
 import { generateSessionTitle } from '../utils/sessionTitleGenerator.js';
 import { withDeadline } from '../utils/timeoutHelper.js';
 import { CleanFormattedDateTime } from '../utils/dateTimeStrings.js';
-import { checkContainerMemory } from '../utils/memoryChecker.js';
 
 const EXISTING_FILES_ID = "EXISTING_FILES_ID";
 const EXISTING_FAQ_ID = "EXISTING_FAQ_ID";
@@ -389,7 +388,8 @@ export class Orchestrator {
       const recommendations = await enrichPrompt("prompt-enricher", this.initialPrompt.trim(), this.assumptions, this.projectSpecification ?? "---No specification provided---", this.multiAgentGeminiClient, this.sendMessage, this.initialImage, this.initialImageMimeType);
 
       const dateTimeString = CleanFormattedDateTime(new Date());
-      this.initialPrompt = `${researchPrompt}\n\n${recommendations}\n\nThe current date and time is: ${dateTimeString}`;
+      this.initialPrompt = 
+        `${this.initialPrompt}\n\n${recommendations}\n\nThe current date and time is: ${dateTimeString}`;
 
       this.updateProgressLog(`\`\`\`\`\n${this.initialPrompt}\n\`\`\`\``);
       this.updateProgressLog('----\n');
