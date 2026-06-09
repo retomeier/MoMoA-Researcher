@@ -6,3 +6,4 @@ dist
 changes.patch
 .firebase-service-account.json
 .env
+src/firebase-config.ts
