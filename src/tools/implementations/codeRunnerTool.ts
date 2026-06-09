@@ -95,7 +95,8 @@ export const CodeRunnerTool: MultiAgentTool = {
     
     if (isPython) {
         updateProgress(`Executing Python script \`${mainScript}\``);
-        args = ['-c', `python3 ${mainScript}`];
+        command = 'python3'; 
+        args = [mainScript];
     } else if (isRust) {
         const hasCargo = files.some(f => f.endsWith('Cargo.toml'));
         if (hasCargo) {
@@ -112,6 +113,8 @@ export const CodeRunnerTool: MultiAgentTool = {
       args,
       files: filesToStage,
       timeoutMs: EXECUTION_TIMEOUT_MS,
+      googleAccessToken: context.secrets.googleAccessToken,
+      gcpProjectId: context.secrets.gcpProjectId
     };
 
     const executionResult = await provider.execute(request);
