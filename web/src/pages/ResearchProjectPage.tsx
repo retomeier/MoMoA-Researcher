@@ -81,6 +81,8 @@ import { PatchViewer } from "../components/PatchViewer";
 import { Header } from "../components/Header";
 import { DEFAULT_GEMINI_LITE_MODEL, DEFAULT_GEMINI_PRO_MODEL } from '../../../src/config/models';
 import { buildProjectContextPrompt } from '@/util/promptEnrichment';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { ToolExecutionEnvironmentType } from '../../../src/momoa_core/types';
 
 interface ProjectRouteParams extends Record<string, string | undefined> {
   projectId: string;
@@ -484,6 +486,31 @@ Within that context, our objective for this Research Project is to complete the 
 ${prompt.trim()}
 """"` 
     : prompt.trim();
+
+    if (prefs.toolRunEnvironment == ToolExecutionEnvironmentType.CloudShellEditor){ // || prefs.toolRunEnvironment == ToolExecutionEnvironmentType.CloudWorkstation) {
+      const getFreshAccessToken = async () => {
+        try {
+          const provider = new GoogleAuthProvider();
+          provider.addScope('https://www.googleapis.com/auth/cloud-platform');
+          
+          // Elevates the existing session to include the new scope
+          const result = await signInWithPopup(auth, provider);
+          const credential = GoogleAuthProvider.credentialFromResult(result);
+          return credential?.accessToken;
+        } catch (error: any) {
+          // If the user closes the popup or is blocked, this catches it.
+          // The base Firebase authentication remains completely intact!
+          console.warn("Failed to acquire Cloud Platform scope:", error);
+          return null; 
+        }
+      };
+
+      const token = await getFreshAccessToken();
+      if (!token)
+        console.log(`Attempted to use loged in user's Cloud Shell but the didn't give / have permission.`)
+      
+      prefs.googleAccessToken = token ?? undefined;
+    }
     
     const requestData: InitialRequestData = {
       secrets: {
@@ -492,9 +519,15 @@ ${prompt.trim()}
         githubToken: prefs.githubToken || "",
         julesApiKey: prefs.julesApiKey || "",
         stitchApiKey: prefs.stitchApiKey || "",
+        e2BApiKey: prefs.e2BApiKey || "",
+        gcpProjectId: prefs.gcpProjectId || "",
+        googleAccessToken: prefs.googleAccessToken || "",
+        cloudWorkstationName: prefs.cloudWorkstationName || "",
+        sshTunnelUrl: prefs.sshTunnelUrl || "",
+        remoteDesktopKey: prefs.remoteDesktopKey || "",
       },
       githubUrl: effectiveGithubUrl,
-      llmName: "gemini-2.5-flash",
+      llmName: "gemini-flash-latest",
       prompt: promptToSend,
       projectSpecification: project.spec || "",
       image: image || "",

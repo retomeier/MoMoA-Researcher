@@ -27,7 +27,13 @@ export type Prefs = {
   githubToken?: string;
   githubScratchPad?: string;
   showDebugInfo?: boolean;
+  e2BApiKey?: string;
+  googleAccessToken?: string;
+  gcpProjectId?: string;
   toolRunEnvironment?: string;
+  cloudWorkstationName?: string;
+  sshTunnelUrl?: string;
+  remoteDesktopKey?: string;
 };
 
 const initialPrefs: Prefs = (() => {

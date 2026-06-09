@@ -69,6 +69,12 @@ export enum VerbosityType {
 
 export enum ToolExecutionEnvironmentType {
   Local = "LOCAL",
+  CloudRun = "CLOUDRUN",
+  CloudShellEditor = "CLOUDSHELLEDITOR",
+  CloudWorkstation = "CLOUDWORKSTATION",
+  E2B = "E2B",
+  Inverse_SSH_Tunnel = "INVERSE_SSH_TUNNEL",
+  Remote_Desktop_Agent = "REMOTE_DESKTOP_AGENT"
 }
 
 export interface MultiAgentToolContext {
@@ -263,3 +269,40 @@ export interface ExtractedData {
 
 export const LARGE_FILE_LIMIT_KB = 100;
 export const MAX_CONTEXT_FILE_SIZE_BYTES = 100 * 1024 * 1024;
+
+export const SWARM_CLIENT_METHODS = {
+  agent_ready: "_swarm/agent_ready",
+  metadata_update: "_swarm/metadata_update",
+  terminal_update: "_swarm/terminal/update",
+  git_patch: "_swarm/git_patch",
+} as const;
+
+export const SWARM_RUNNER_METHODS = {
+  session_prompt: "_swarm/session/prompt",
+  session_cancel: "_swarm/session/cancel",
+} as const;
+
+export type SessionMetadata = {
+  title: string;
+  status: "pending" | "running" | "complete" | "failed" | "blocked" | "idle";
+  summary?: string;
+  startedAt?: number;
+  modifiedAt?: number;
+  latestUpdate?: string;
+  agentName: string;
+  config?: Record<string, unknown>;
+  secrets?: Record<string, boolean>;
+  serverName: string;
+  serverInstanceId: string | null;
+  [key: `_ext_${string}`]: unknown;
+};
+
+export type SwarmTerminalUpdateNotification = {
+  terminalId: string;
+  stdoutChunk?: string;
+  stderrChunk?: string;
+};
+
+export type SwarmGitPatchNotification = {
+  patch: string;
+};
