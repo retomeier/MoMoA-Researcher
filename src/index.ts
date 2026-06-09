@@ -21,7 +21,7 @@ import path from 'path';
 import process from 'process';
 import { getAuth } from 'firebase-admin/auth';
 import { initializeWebSocketServer } from './websocket_server.js';
-import { abortSession, runSession, deleteProjectAndDependencies } from './firebase_server.js';
+import { abortSession, runSession, deleteProjectAndDependencies, pollAgentTask, submitAgentResult, validateAgentToken, clearAllAgentTasks } from './firebase_server.js';
 
 // --- Server Setup ---
 
@@ -37,6 +37,17 @@ initializeWebSocketServer(port, server);
 
 // Service sessions with state persisted in Firebase RTDB
 app.use(cors());
+app.post('/api/agent/clear', authenticateAgent, async (req, res) => {
+    const agentId = (req as any).agentId;
+
+    try {
+        await clearAllAgentTasks(agentId);
+        return res.status(200).json({ status: 'success' });
+    } catch (e) {
+        console.error(`Error clearing tasks for agent ${agentId}:`, e);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
 app.post('/s/run-session', express.json({ type: '*/*' }), async (req, res) => {
     const { sessionId } = req.body;
 
@@ -101,6 +112,61 @@ app.delete('/s/delete-project/:projectId', async (req, res) => {
         }
 
         return res.status(500).json({ error: 'Internal server error during deletion.' });
+    }
+});
+
+async function authenticateAgent(req: express.Request, res: express.Response, next: express.NextFunction) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Unauthorized: Missing or invalid token.' });
+    }
+
+    const agentToken = authHeader.split('Bearer ')[1];
+
+    try {
+        // Use the helper function instead of accessing `db` directly
+        const isValid = await validateAgentToken(agentToken);
+        
+        if (!isValid) {
+            return res.status(403).json({ error: 'Forbidden: Invalid Agent Token.' });
+        }
+
+        // Attach the validated token to the request object so the next route can use it
+        (req as any).agentId = agentToken; 
+        
+        next();
+    } catch (e) {
+        return res.status(500).json({ error: 'Internal auth error.' });
+    }
+}
+
+app.get('/api/agent/poll', authenticateAgent, async (req, res) => {
+    const agentId = (req as any).agentId; // Extracted from the validated token
+
+    try {
+        const task = await pollAgentTask(agentId);
+        if (!task) {
+            return res.status(204).send(); 
+        }
+        return res.status(200).json(task);
+    } catch (e) {
+        console.error(`Error polling for agent ${agentId}:`, e);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.post('/api/agent/result', express.json({ limit: '50mb' }), authenticateAgent, async (req, res) => {
+    const agentId = (req as any).agentId; 
+    const taskId = req.query.taskId as string;
+    
+    if (!taskId) return res.status(400).json({ error: "Missing taskId" });
+
+    try {
+        await submitAgentResult(agentId, taskId, req.body);
+        return res.status(200).json({ status: 'success' });
+    } catch (e) {
+        console.error(`Error submitting result for agent ${agentId}:`, e);
+        return res.status(500).json({ error: 'Internal server error' });
     }
 });
 

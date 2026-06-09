@@ -165,6 +165,18 @@ export async function runSession(
 }
 
 /**
+ * Validates if an Agent API key exists in the database.
+ */
+async function validateAgentToken(token: string): Promise<boolean> {
+    const tokenSnapshot = await db.ref(`api_keys/${token}`).get();
+    return tokenSnapshot.exists();
+    
+    // Note: If you need to return the user's UID for deeper authorization later, 
+    // you can change this to return the UID string or null instead of a boolean.
+    // return tokenSnapshot.exists() ? tokenSnapshot.val().uid : null;
+}
+
+/**
  * Sends a message to a specific client.
  * @param {string} sessionId - The session ID to send the message to.
  * @param {string} message - The message payload to send.
@@ -713,6 +725,11 @@ if (githubUrl) {
       });
     }
 
+    if (secrets.remoteDesktopKey) {
+      console.log(`Registering Local Agent API Key for client ${clientUUID}`);
+      await registerAgentToken(secrets.remoteDesktopKey, clientUUID);
+    }
+
     // 2.5b Update session title
     let sessionTitle = "Untitled Session"
     await generateSessionTitle(requestData.prompt, geminiClient).then((title) => {
@@ -897,6 +914,98 @@ async function deleteProjectAndDependencies(
   return true;
 }
 
+/**
+ * Clears ALL tasks (pending and processing) for a given agent.
+ * Used when the CLI boots up to ensure a clean slate.
+ */
+export async function clearAllAgentTasks(agentId: string): Promise<void> {
+    const tasksRef = db.ref(`agent_tasks/${agentId}`);
+    
+    // Completely wipe the node for this agent
+    await tasksRef.remove();
+    console.log(`[Agent Queue] CLI restarted. Cleared all tasks for agent: ${agentId}`);
+}
+
+/**
+ * Checks for a pending task for a specific agent.
+ * Uses atomic transactions to support concurrent local workers.
+ */
+async function pollAgentTask(agentId: string): Promise<{ taskId: string, request: any } | null> {
+    const tasksRef = db.ref(`agent_tasks/${agentId}`);
+    
+    // Fetch tasks for this agent
+    // Note: We remove limitToFirst(1) so we can see past the 'processing' tasks
+    const snapshot = await tasksRef.orderByKey().get();
+    
+    if (!snapshot.exists()) {
+        return null;
+    }
+
+    const tasks = snapshot.val();
+
+    // Iterate through the queue to find the first available task
+    for (const [taskId, taskData] of Object.entries(tasks)) {
+        const task = taskData as any;
+
+        // Check if the task is available (no response yet, and not already processing)
+        if (!task.response && task.status !== 'processing') {
+            
+            try {
+                // Attempt to claim it atomically using a transaction
+                const transactionResult = await tasksRef.child(taskId).transaction((currentData) => {
+                    // If the task was deleted while we were looking, abort
+                    if (currentData === null) {
+                        return null; 
+                    }
+                    
+                    // Double-check inside the transaction that it hasn't been claimed
+                    if (!currentData.response && currentData.status !== 'processing') {
+                        currentData.status = 'processing';
+                        currentData.startedAt = Date.now(); // Optional: useful for timeout sweeps
+                        return currentData; 
+                    }
+                    
+                    // Abort the transaction if another worker beat us to it
+                    return undefined; 
+                });
+
+                // If our transaction was successful, return the claimed task!
+                if (transactionResult.committed && transactionResult.snapshot.val()) {
+                    const claimedTask = transactionResult.snapshot.val();
+                    return { 
+                        taskId, 
+                        request: claimedTask.request 
+                    };
+                }
+            } catch (err: any) {
+                // Catch maxretry or network errors so the worker doesn't crash
+                console.warn(`[Agent Queue] Transaction failed while trying to claim task ${taskId}:`, err.message);
+                // The loop naturally continues to try the next task in the queue
+            }
+        }
+    }
+
+    // If we get here, all tasks are either finished or currently processing
+    return null;
+}
+
+/**
+ * Saves the execution result from the agent back to the database.
+ */
+async function submitAgentResult(agentId: string, taskId: string, resultPayload: any): Promise<void> {
+    await db.ref(`agent_tasks/${agentId}/${taskId}/response`).set(resultPayload);
+}
+
+/**
+ * Registers a new Local Agent API key in the database for a specific session.
+ */
+async function registerAgentToken(token: string, sessionId: string): Promise<void> {
+    await db.ref(`api_keys/${token}`).set({
+        createdAt: Date.now(),
+        sessionId: sessionId
+    });
+}
+
 // Export the public functions
 export {
   db,
@@ -909,4 +1018,8 @@ export {
   handleInitialRequestParams,
   handleStartTask,
   sendMessage,
+  submitAgentResult,
+  pollAgentTask,
+  validateAgentToken,
+  registerAgentToken
 };

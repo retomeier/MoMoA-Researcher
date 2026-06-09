@@ -84,9 +84,6 @@ export function getExecutionProvider(context: MultiAgentToolContext | undefined)
   if (!context)
     return new LocalExecutionProvider();
 
-  console.log(`Env: ${context.toolExecutionEnvironment}`);
-
-  
   switch (context.toolExecutionEnvironment) {
     case ToolExecutionEnvironmentType.CloudWorkstation:
       return new CloudWorkstationsExecutionProvider(
