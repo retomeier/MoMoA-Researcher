@@ -25,5 +25,6 @@
     }
   },
   "include": ["src", "../src/shared", "../src/firebase-config.ts"],
+  "exclude": ["../src/shared/**/*.test.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
