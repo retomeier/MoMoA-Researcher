@@ -83,6 +83,12 @@ import { DEFAULT_GEMINI_LITE_MODEL, DEFAULT_GEMINI_PRO_MODEL } from '../../../sr
 import { buildProjectContextPrompt } from '@/util/promptEnrichment';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { ToolExecutionEnvironmentType } from '../../../src/momoa_core/types';
+import {
+  createHumanReviewAssessment,
+  parseResearchContinuationAssessment,
+  ResearchContinuationAssessment,
+  ResearchContinuationDecision,
+} from '../../../src/shared/researchContinuation';
 
 interface ProjectRouteParams extends Record<string, string | undefined> {
   projectId: string;
@@ -93,6 +99,13 @@ interface TaskItem {
   id: string;
   title: string;
 }
+
+const CONTINUATION_DECISION_LABELS: Record<ResearchContinuationDecision, string> = {
+  continue: "Continue",
+  stop_sufficient: "Research sufficient",
+  stop_blocked: "Research blocked",
+  human_review: "Human review needed",
+};
 
 const SPEAKER_LABELS: Record<string, string> = {
   user: 'You',
@@ -163,6 +176,8 @@ export const ResearchProjectPage: React.FC = () => {
   const [sessionContextText, setSessionContextText] = useState<string>("");
   const [isGeneratingTasks, setIsGeneratingTasks] = useState(false);
   const [isGeneratingProjectDetails, setIsGeneratingProjectDetails] = useState(false);
+  const [continuationAssessment, setContinuationAssessment] =
+    useState<ResearchContinuationAssessment | null>(null);
 
   // 1. Initialize state DIRECTLY from localStorage (Lazy Initializer)
   const [autoRunNext, setAutoRunNext] = useState(() => {
@@ -222,6 +237,23 @@ export const ResearchProjectPage: React.FC = () => {
     const unsubscribe = onValue(tasksRef, (snapshot) => {
       const data = snapshot.val() as Record<string, ProposedTask> | null;
       setTasks(data ? Object.entries(data).map(([key, val]) => ({ id: key, title: val.title })) : []);
+    });
+    return () => unsubscribe();
+  }, [projectId]);
+
+  // Fetch the latest explicit decision about whether research should continue.
+  useEffect(() => {
+    if (!projectId) return;
+    const assessmentRef = ref(
+      db,
+      `${PROJECT_ROOT_PATH}/${projectId}/continuationAssessment`
+    );
+    const unsubscribe = onValue(assessmentRef, (snapshot) => {
+      setContinuationAssessment(
+        snapshot.exists()
+          ? parseResearchContinuationAssessment(snapshot.val())
+          : null
+      );
     });
     return () => unsubscribe();
   }, [projectId]);
@@ -440,13 +472,18 @@ export const ResearchProjectPage: React.FC = () => {
             }
 
             // GENERATE new tasks
-            const newTasks = await generateProposedTasks(historyItems);
+            const continuation = await generateProposedTasks(historyItems);
 
-            // AUTO-RUN the top suggestion if continuous mode is checked
-            if (autoRunNextRef.current && newTasks && newTasks.length > 0) {
-              console.log(`Auto-running next task: ${newTasks[0]}`);
+            // AUTO-RUN only when the explicit sufficiency decision authorizes it.
+            if (
+              autoRunNextRef.current &&
+              continuation?.decision === "continue" &&
+              continuation.proposedTasks.length > 0
+            ) {
+              const nextTask = continuation.proposedTasks[0];
+              console.log(`Auto-running next task: ${nextTask}`);
               setTimeout(() => {
-                newSession(newTasks[0], { attachments: [], notWorkingBuild: false });
+                newSession(nextTask, { attachments: [], notWorkingBuild: false });
               }, 2000); // Small delay to let Firebase state sync/animate for the user
             }
           }
@@ -461,7 +498,7 @@ export const ResearchProjectPage: React.FC = () => {
   ): Promise<boolean> => {
     if (!prompt.trim() || !user || !projectId || !project) return false;
     const newSessionId = generateId();
-    
+
     set(ref(db, `${USERINFO_ROOT_PATH}/${user.uid}/sessions/${newSessionId}`), true);
 
     const sessionRef = ref(db, `${SESSION_ROOT_PATH}/${newSessionId}`);
@@ -783,15 +820,44 @@ const handleDeleteProject = async () => {
     }
   };
 
-const generateProposedTasks = async (_currentSessionHistoryItems: HistoryItem[]): Promise<string[]> => {
-    if (!prefs.geminiApiKey || !projectId || !project || !sessionId) return [];
+const generateProposedTasks = async (
+    _currentSessionHistoryItems: HistoryItem[]
+  ): Promise<ResearchContinuationAssessment | null> => {
+    if (!prefs.geminiApiKey || !projectId || !project || !sessionId) return null;
 
     setIsGeneratingTasks(true);
+    const persistAssessment = (
+      assessment: ResearchContinuationAssessment
+    ): Promise<void> =>
+      update(ref(db, `${PROJECT_ROOT_PATH}/${projectId}`), {
+        continuationAssessment: assessment,
+        [`continuationAssessments/${sessionId}`]: assessment,
+      });
+
     try {
       // 1. Define the specific objectives for this LLM call
-      const taskObjective = `You are an expert Research Agent Coordinator. Your goal is to propose the next best research tasks to advance the Overall Objective.  Based on the overarching Research Project Definition, the progress from past tasks, and the detailed log of the most recent task, propose **no more than four** clear, actionable research tasks that could provide a better or more comprehensive result for the overall project, or builds on the results from the most recently completed task. Rank them so that any deliverables required to complete the project are listed first. Don't give them titles or headings, format each propsed task so that it can be provided directly to the Research Agent.`;
+      const taskObjective = `You are an expert Research Agent Coordinator. Decide whether another research session is justified by the overarching Research Project Definition, the progress from past tasks, and the detailed log of the most recent task.
+
+Treat stopping as a valid research outcome. Assess objective coverage, unresolved material questions, contradictions, evidence limitations, and the expected information gain of another session. Do not propose work merely because more research is possible.
+
+Choose exactly one decision:
+- "continue": A concrete unresolved need remains and another session has a high or medium expected information gain. Provide one to four ordered, actionable tasks. A low or absent expected information gain does not authorize automatic continuation.
+- "stop_sufficient": The original objective is adequately satisfied by the available evidence. Provide no tasks. Do not claim sufficiency while a material question is still unresolved or the expected information gain is high.
+- "stop_blocked": Material progress requires unavailable data, capabilities, access, or external action. Provide no tasks.
+- "human_review": Continuing would depend on a human preference, scope change, consequential trade-off, or risk decision. Provide one to four candidate tasks when they would help a person decide; they are offered for manual selection only and will not run automatically.
+
+When continuing, rank deliverables needed for the original objective first. Format each task so it can be provided directly to the Research Agent.`;
       
-      const outputFormat = `Return ONLY a JSON array of strings representing your ordered list of proposed research tasks. Example: ["Do research tas.", "Do other research task."]`;
+      const outputFormat = `Return ONLY a JSON object with this exact shape:
+{
+  "decision": "continue" | "stop_sufficient" | "stop_blocked" | "human_review",
+  "rationale": "Concise evidence-based reason for the decision.",
+  "objectiveCoverage": ["What parts of the original objective are already satisfied."],
+  "unresolvedQuestions": ["Only material unresolved questions."],
+  "evidenceLimitations": ["Known limitations, contradictions, or unavailable evidence."],
+  "expectedInformationGain": "high" | "medium" | "low" | "none",
+  "proposedTasks": ["One to four tasks for continue or human_review; an empty array for stop_sufficient and stop_blocked."]
+}`;
 
       // 2. Use the standardized utility to build the prompt
       const prompt = await buildProjectContextPrompt(
@@ -807,25 +873,47 @@ const generateProposedTasks = async (_currentSessionHistoryItems: HistoryItem[])
 
       if (responseText) {
         const cleanText = removeBacktickFences(responseText);
-        const tasksArray = JSON.parse(cleanText);
-        
-        if (Array.isArray(tasksArray) && tasksArray.length > 0) {
+        const assessment = parseResearchContinuationAssessment(
+          JSON.parse(cleanText)
+        );
+        const assessmentWithTimestamp = {
+          ...assessment,
+          assessedAt: Date.now(),
+        };
+
+        await persistAssessment(assessmentWithTimestamp);
+
+        if (assessment.proposedTasks.length > 0) {
           const tasksRef = ref(db, `${PROJECT_ROOT_PATH}/${projectId}/proposedTasks`);
           
-          // Push the newly generated tasks to Firebase
-          tasksArray.forEach(taskTitle => {
+          // Keep suggestions available for manual review even when auto-run is withheld.
+          assessment.proposedTasks.forEach(taskTitle => {
              push(tasksRef, { title: String(taskTitle) });
           });
-
-          return tasksArray.map(String);
         }
+
+        return assessmentWithTimestamp;
       }
     } catch (e) {
       console.error("Failed to generate proposed tasks", e);
+      const fallbackAssessment = {
+        ...createHumanReviewAssessment(
+          "The research-continuation assessment could not be generated or parsed. Automatic continuation was withheld."
+        ),
+        assessedAt: Date.now(),
+      };
+
+      try {
+        await persistAssessment(fallbackAssessment);
+      } catch (writeError) {
+        console.error("Failed to save continuation fallback", writeError);
+      }
+
+      return fallbackAssessment;
     } finally {
       setIsGeneratingTasks(false);
     }
-    return [];
+    return null;
   };
 
   if (loading || !project) {
@@ -1045,9 +1133,64 @@ const generateProposedTasks = async (_currentSessionHistoryItems: HistoryItem[])
                   onCheckedChange={(checked) => setAutoRunNext(!!checked)} 
                 />
                 <Text size="1" weight="medium" color="gray" style={{ cursor: 'default' }}>
-                  Auto-run top suggestion (Client Side)
+                  Auto-run only when decision is Continue
                 </Text>
               </Flex>
+
+              {continuationAssessment && (
+                <Card size="1" variant="surface">
+                  <Flex direction="column" gap="2">
+                    <Flex align="center" justify="between" gap="2">
+                      <Text size="1" weight="bold">
+                        Latest research continuation
+                      </Text>
+                      <Badge size="1" color="gray">
+                        {
+                          CONTINUATION_DECISION_LABELS[
+                            continuationAssessment.decision
+                          ]
+                        }
+                      </Badge>
+                    </Flex>
+                    <Text size="1" color="gray">
+                      {continuationAssessment.rationale}
+                    </Text>
+                    <Text size="1" color="gray">
+                      Expected information gain:{" "}
+                      {formatString(
+                        continuationAssessment.expectedInformationGain
+                      )}
+                      {continuationAssessment.assessedAt && (
+                        <>
+                          {" · "}
+                          <Timestamp
+                            precise
+                            timestamp={continuationAssessment.assessedAt}
+                          />
+                        </>
+                      )}
+                    </Text>
+                    {continuationAssessment.objectiveCoverage.length > 0 && (
+                      <Text size="1" color="gray">
+                        Covered:{" "}
+                        {continuationAssessment.objectiveCoverage.join(" • ")}
+                      </Text>
+                    )}
+                    {continuationAssessment.unresolvedQuestions.length > 0 && (
+                      <Text size="1" color="gray">
+                        Unresolved:{" "}
+                        {continuationAssessment.unresolvedQuestions.join(" • ")}
+                      </Text>
+                    )}
+                    {continuationAssessment.evidenceLimitations.length > 0 && (
+                      <Text size="1" color="gray">
+                        Evidence limitations:{" "}
+                        {continuationAssessment.evidenceLimitations.join(" • ")}
+                      </Text>
+                    )}
+                  </Flex>
+                </Card>
+              )}
               
               {tasks.map((task) => (
                 <TaskCard 
